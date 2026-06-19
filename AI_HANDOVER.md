@@ -40,6 +40,7 @@ The user requested "simple but innovative ideas" in the previous session. The fo
 4. Tamagotchi style pet (e.g. dragon egg that hatches and grows as the user drinks water).
 
 ### Known Technical Debt / Warnings
+- **BROKEN FEATURES:** The **Barcode Scanner** and **Image-to-Calories (Vision AI)** features are currently NOT working. They have been implemented in `MealsScreen.js` and `foodService.js`, but they require debugging in the next session to identify why they fail to scan or return results.
 - **Groq API vs Gemini:** The `package.json` contains `@google/generative-ai` but the project actively uses Groq API via standard REST `fetch` calls.
 - **Android Build:** The project uses Expo CNG (Continuous Native Generation) but has a prebuilt `android` folder. Ensure `$env:JAVA_HOME` is set to Java 17 when running `npm run android` since Java 8 throws a compatibility error.
 - **Firebase Permissions:** Ensure the Firestore rules allow reads/writes for the `v2_` food cache.
