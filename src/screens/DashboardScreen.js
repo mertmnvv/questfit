@@ -370,20 +370,20 @@ export default function DashboardScreen() {
             <View style={styles.rpgStatsRow}>
               <View style={styles.rpgStatBox}>
                 <Text style={styles.rpgStatLabel}>{t('dashboard.str')}</Text>
-                <Text style={styles.rpgStatVal}>{Math.round(consumedToday?.protein || 0)}/{Math.round(stats?.proteinTarget || 120)}g</Text>
-                <View style={styles.rpgStatBarBg}><View style={[styles.rpgStatBarFill, { backgroundColor: '#FF6B6B', width: `${Math.min(100, ((consumedToday?.protein || 0)/(stats?.proteinTarget || 120))*100)}%` }]} /></View>
+                <Text style={styles.rpgStatVal}>{Math.round(consumedToday?.protein || 0)}/{Math.round(stats?.macros?.protein || 120)}g</Text>
+                <View style={styles.rpgStatBarBg}><View style={[styles.rpgStatBarFill, { backgroundColor: '#FF6B6B', width: `${Math.min(100, ((consumedToday?.protein || 0)/(stats?.macros?.protein || 120))*100)}%` }]} /></View>
               </View>
 
               <View style={styles.rpgStatBox}>
                 <Text style={styles.rpgStatLabel}>{t('dashboard.agi')}</Text>
-                <Text style={styles.rpgStatVal}>{Math.round(consumedToday?.carbs || 0)}/{Math.round(stats?.carbsTarget || 200)}g</Text>
-                <View style={styles.rpgStatBarBg}><View style={[styles.rpgStatBarFill, { backgroundColor: '#4DABF7', width: `${Math.min(100, ((consumedToday?.carbs || 0)/(stats?.carbsTarget || 200))*100)}%` }]} /></View>
+                <Text style={styles.rpgStatVal}>{Math.round(consumedToday?.carbs || 0)}/{Math.round(stats?.macros?.carbs || 200)}g</Text>
+                <View style={styles.rpgStatBarBg}><View style={[styles.rpgStatBarFill, { backgroundColor: '#4DABF7', width: `${Math.min(100, ((consumedToday?.carbs || 0)/(stats?.macros?.carbs || 200))*100)}%` }]} /></View>
               </View>
 
               <View style={styles.rpgStatBox}>
                 <Text style={styles.rpgStatLabel}>{t('dashboard.vit')}</Text>
-                <Text style={styles.rpgStatVal}>{Math.round(consumedToday?.fat || 0)}/{Math.round(stats?.fatTarget || 70)}g</Text>
-                <View style={styles.rpgStatBarBg}><View style={[styles.rpgStatBarFill, { backgroundColor: '#FCC419', width: `${Math.min(100, ((consumedToday?.fat || 0)/(stats?.fatTarget || 70))*100)}%` }]} /></View>
+                <Text style={styles.rpgStatVal}>{Math.round(consumedToday?.fat || 0)}/{Math.round(stats?.macros?.fat || 70)}g</Text>
+                <View style={styles.rpgStatBarBg}><View style={[styles.rpgStatBarFill, { backgroundColor: '#FCC419', width: `${Math.min(100, ((consumedToday?.fat || 0)/(stats?.macros?.fat || 70))*100)}%` }]} /></View>
               </View>
             </View>
           </View>
