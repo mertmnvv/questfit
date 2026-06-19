@@ -1,372 +1,397 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
-  Modal,
-  Animated,
-  Keyboard,
-  Platform,
-  Dimensions,
-  ScrollView
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import Toast from 'react-native-toast-message';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Modal, Dimensions, Platform } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Slider from '@react-native-community/slider';
 import { useTranslation } from 'react-i18next';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 
 import { useThemeColors } from '../hooks/useThemeColors';
-import { searchFood } from '../services/foodService';
+import { searchFood, searchFoodByBarcode, analyzeFoodFromImage } from '../services/foodService';
 import { useUserStore } from '../store/userStore';
-import { SPACING, FONT_SIZE, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../theme';
-import HorizontalSlider from '../components/HorizontalSlider';
+import { SPACING, TYPOGRAPHY, FONT_SIZE, BORDER_RADIUS, SHADOWS } from '../theme';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
-const MOCK_QUICK_FOODS = [
-  { 
-    id: 'q1', name: 'Yumurta (Haşlanmış)', type: 'Protein', description: '1 Adet Orta Boy', 
-    baseAmount: 100, pieceWeight: 50, portionWeight: 100, macros: { calories: 155, protein: 13, carbs: 1.1, fat: 11 } 
-  },
-  { 
-    id: 'q2', name: 'Yulaf Ezmesi', type: 'Karb', description: 'Lif kaynağı', 
-    baseAmount: 100, pieceWeight: 0, portionWeight: 50, macros: { calories: 389, protein: 16.9, carbs: 66.3, fat: 6.9 } 
-  },
-  { 
-    id: 'q3', name: 'Tavuk Göğsü', type: 'Protein', description: 'Izgara, Derisiz', 
-    baseAmount: 100, pieceWeight: 150, portionWeight: 150, macros: { calories: 165, protein: 31, carbs: 0, fat: 3.6 } 
-  },
-  { 
-    id: 'q4', name: 'Muz', type: 'Meyve', description: 'Orta boy', 
-    baseAmount: 100, pieceWeight: 120, portionWeight: 120, macros: { calories: 89, protein: 1.1, carbs: 22.8, fat: 0.3 } 
-  }
-];
+// Debounce helper
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+};
 
 export default function MealsScreen() {
   const { t } = useTranslation();
-  const COLORS = useThemeColors();
-  const styles = useMemo(() => getStyles(COLORS), [COLORS]);
-
   const navigation = useNavigation();
   const route = useRoute();
-  const mealType = route.params?.mealType || t('dashboard.snack');
+  const mealType = route.params?.mealType || 'breakfast'; // default
+  
+  const COLORS_THEME = useThemeColors();
+  const styles = useMemo(() => getStyles(COLORS_THEME), [COLORS_THEME]);
+  const addFood = useUserStore(state => state.addFood);
 
-  const { addFood, recentFoods, recentSearches, addRecentSearch } = useUserStore();
-
-  // Search State
   const [query, setQuery] = useState('');
+  const debouncedQuery = useDebounce(query, 800);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
 
-  // Bottom Sheet State
   const [selectedFood, setSelectedFood] = useState(null);
-  const [amountInput, setAmountInput] = useState('100');
-  const [unit, setUnit] = useState('Gram');
-  const [sheetVisible, setSheetVisible] = useState(false);
+  const [amount, setAmount] = useState(1);
+  const [inputText, setInputText] = useState('1');
+  const [unit, setUnit] = useState('piece'); // piece, portion, gram
 
-  // Dynamic Calories Calculation
-  const dynamicCalories = useMemo(() => {
-    if (!selectedFood) return 0;
-    const inputVal = parseFloat(amountInput.replace(',', '.')) || 0;
-    
-    let finalGrams = inputVal;
-    if (unit === 'Porsiyon') {
-      finalGrams = inputVal * (selectedFood.portionWeight || 200);
-    } else if (unit === 'Adet') {
-      finalGrams = inputVal * (selectedFood.pieceWeight || 100);
-    }
+  // Camera & Image Picker
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [scanning, setScanning] = useState(false);
 
-    const calsPer100 = selectedFood.macros?.calories || 0;
-    return (finalGrams / 100) * calsPer100;
-  }, [selectedFood, amountInput, unit]);
-
-  // Search Function
-  const handleSearch = async (overrideQuery) => {
-    const searchQuery = typeof overrideQuery === 'string' ? overrideQuery : query;
-    if (!searchQuery.trim()) return;
-    setLoading(true);
-    setHasSearched(true);
-    Keyboard.dismiss();
-    try {
-      addRecentSearch(searchQuery);
-      const data = await searchFood(searchQuery);
-      setResults(data);
-      if (data.length === 0) {
-        Toast.show({ type: 'info', text1: 'Sonuç bulunamadı', text2: 'Farklı bir arama yapmayı deneyin.' });
-      }
-    } catch (error) {
-      Toast.show({ 
-        type: 'error', 
-        text1: 'Arama Hatası', 
-        text2: error.message || 'Yapay zeka servisi şu an yanıt veremiyor.'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Bottom Sheet Open
-  const openBottomSheet = (food) => {
-    setSelectedFood(food);
-    setUnit('Gram');
-    setAmountInput('100');
-    setSheetVisible(true);
-  };
-
-  const closeBottomSheet = () => {
-    setSheetVisible(false);
-    setTimeout(() => setSelectedFood(null), 300); // Wait for animation
-  };
-
-  // Add Food Action
-  const handleAddFood = () => {
-    const inputVal = parseFloat(amountInput.replace(',', '.'));
-    if (!inputVal || inputVal <= 0) {
-      Toast.show({ type: 'error', text1: 'Lütfen geçerli bir miktar girin' });
+  // Search logic
+  useEffect(() => {
+    if (!debouncedQuery) {
+      setResults([]);
+      setErrorMsg(null);
       return;
     }
+    const fetchFood = async () => {
+      setLoading(true);
+      setErrorMsg(null);
+      try {
+        const data = await searchFood(debouncedQuery);
+        setResults(data || []);
+      } catch (err) {
+        setErrorMsg(t('meals.aiError'));
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFood();
+  }, [debouncedQuery]);
 
-    let finalGrams = inputVal;
-    if (unit === 'Porsiyon') {
-      finalGrams = inputVal * (selectedFood.portionWeight || 200);
-    } else if (unit === 'Adet') {
-      finalGrams = inputVal * (selectedFood.pieceWeight || 100);
+  const handleSelectFood = (food) => {
+    setSelectedFood(food);
+    if (food.pieceWeight > 0) {
+      setUnit('piece');
+      setAmount(1);
+      setInputText('1');
+    } else if (food.portionWeight > 0) {
+      setUnit('portion');
+      setAmount(1);
+      setInputText('1');
+    } else {
+      setUnit('gram');
+      setAmount(100);
+      setInputText('100');
     }
+  };
 
-    addFood(selectedFood, finalGrams, mealType);
+  const getMultiplier = () => {
+    if (!selectedFood) return 1;
+    const baseUnitWeight = selectedFood.pieceWeight || selectedFood.portionWeight || 100;
+    if (unit === 'gram') {
+      return amount / baseUnitWeight;
+    }
+    return amount; // Piece or Portion
+  };
+
+  const currentMacros = useMemo(() => {
+    if (!selectedFood) return { cals: 0, p: 0, c: 0, f: 0 };
+    const mult = getMultiplier();
+    return {
+      cals: Math.round(selectedFood.macros.calories * mult),
+      p: Math.round(selectedFood.macros.protein * mult),
+      c: Math.round(selectedFood.macros.carbs * mult),
+      f: Math.round(selectedFood.macros.fat * mult)
+    };
+  }, [selectedFood, amount, unit]);
+
+  const handleSaveMeal = () => {
+    if (!selectedFood) return;
+    const finalAmountGram = unit === 'gram' ? amount : amount * (selectedFood.pieceWeight || selectedFood.portionWeight || 100);
     
-    Toast.show({
-      type: 'success',
-      text1: 'Başarıyla Eklendi',
-      text2: `${inputVal} ${unit} ${selectedFood.name} günlüğe kaydedildi.`,
-      position: 'top',
-      topOffset: 60,
+    addFood({
+      id: Date.now().toString(),
+      name: selectedFood.name,
+      mealType,
+      calories: currentMacros.cals,
+      protein: currentMacros.p,
+      carbs: currentMacros.c,
+      fat: currentMacros.f,
+      amount: finalAmountGram,
+      source: 'AI'
     });
     
-    closeBottomSheet();
-    navigation.navigate('MainTabs', { screen: 'DashboardTab' });
+    navigation.goBack();
   };
 
-  // UI Renders
-  const renderFoodCard = ({ item }) => {
-    // Safely get macros
-    const cals = item.macros?.calories ? Math.round(item.macros.calories) : 0;
-    const pro = item.macros?.protein ? Math.round(item.macros.protein) : 0;
-    const carb = item.macros?.carbs ? Math.round(item.macros.carbs) : 0;
-    const fat = item.macros?.fat ? Math.round(item.macros.fat) : 0;
+  const handleImagePick = async () => {
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.5,
+        base64: true,
+      });
 
-    return (
-      <TouchableOpacity
-        style={styles.foodCard}
-        onPress={() => openBottomSheet(item)}
-        activeOpacity={0.8}
-      >
-        <View style={styles.foodInfo}>
-          <Text style={styles.foodName}>{item.name}</Text>
-          <Text style={styles.foodDesc} numberOfLines={1}>{item.description}</Text>
-          
-          <View style={styles.macroBadges}>
-            <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
-              <MaterialCommunityIcons name="fire" size={12} color={COLORS.accent} />
-              <Text style={[styles.badgeText, { color: COLORS.text }]}>{cals} kcal</Text>
-            </View>
-            <View style={[styles.badge, { backgroundColor: 'rgba(255,107,107,0.1)' }]}>
-              <Text style={[styles.badgeText, { color: '#FF6B6B' }]}>P: {pro}g</Text>
-            </View>
-            <View style={[styles.badge, { backgroundColor: 'rgba(77,171,247,0.1)' }]}>
-              <Text style={[styles.badgeText, { color: '#4DABF7' }]}>K: {carb}g</Text>
-            </View>
-            <View style={[styles.badge, { backgroundColor: 'rgba(252,196,25,0.1)' }]}>
-              <Text style={[styles.badgeText, { color: '#FCC419' }]}>Y: {fat}g</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.addIconContainer}>
-          <MaterialCommunityIcons name="plus" size={24} color={COLORS.primary} />
-        </View>
-      </TouchableOpacity>
-    );
+      if (!result.canceled && result.assets[0].base64) {
+        setLoading(true);
+        setErrorMsg(null);
+        try {
+          const data = await analyzeFoodFromImage(result.assets[0].base64);
+          if (data && data.length > 0) {
+            setResults(data);
+            handleSelectFood(data[0]); // Automatically select the first identified food
+          } else {
+            setErrorMsg('Yemek bulunamadı.');
+          }
+        } catch (err) {
+          setErrorMsg('Resim analiz edilirken bir hata oluştu.');
+        } finally {
+          setLoading(false);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const renderRecentSearches = () => {
-    if (!recentSearches || recentSearches.length === 0) return null;
-    return (
-      <View style={{ paddingHorizontal: SPACING.lg, marginBottom: SPACING.md }}>
-        <Text style={{ fontFamily: TYPOGRAPHY.fontFamily.bold, color: COLORS.textSecondary, fontSize: 12, marginBottom: SPACING.sm }}>
-          Son Aramalar
-        </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {recentSearches.map((s, idx) => (
-            <TouchableOpacity 
-              key={idx} 
-              style={{ backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginRight: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
-              onPress={() => {
-                setQuery(s);
-                handleSearch(s);
-              }}
-            >
-              <Text style={{ color: COLORS.text, fontSize: 12 }}>{s}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-    );
+  const handleBarcodeScanned = async ({ type, data }) => {
+    if (scanning) return;
+    setScanning(true);
+    setShowCamera(false);
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const barcodeResults = await searchFoodByBarcode(data);
+      if (barcodeResults && barcodeResults.length > 0) {
+        setResults(barcodeResults);
+        handleSelectFood(barcodeResults[0]);
+      } else {
+        setErrorMsg('Barkod veritabanında bulunamadı.');
+      }
+    } catch (err) {
+      setErrorMsg('Barkod tarama hatası.');
+    } finally {
+      setLoading(false);
+      setScanning(false);
+    }
   };
 
-  const renderQuickAccess = () => {
-    const displayFoods = (recentFoods && recentFoods.length > 0) ? recentFoods : MOCK_QUICK_FOODS;
-    const title = (recentFoods && recentFoods.length > 0) ? 'Son Eklenenler' : 'Sık Tüketilenler';
-
-    return (
-      <View style={styles.quickAccessSection}>
-        {renderRecentSearches()}
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: SPACING.lg }}>
-          {displayFoods.map(food => (
-            <TouchableOpacity key={food.id} style={styles.quickCard} onPress={() => openBottomSheet(food)}>
-              <View style={styles.quickIconCircle}>
-                <MaterialCommunityIcons name="food-apple" size={24} color={COLORS.primary} />
-              </View>
-              <Text style={styles.quickCardName} numberOfLines={1}>{food.name}</Text>
-              <Text style={styles.quickCardCals}>{Math.round(food.macros.calories)} kcal</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-    );
+  const openCamera = async () => {
+    if (!cameraPermission?.granted) {
+      const res = await requestCameraPermission();
+      if (!res.granted) {
+        alert('Kamera izni gerekiyor!');
+        return;
+      }
+    }
+    setShowCamera(true);
   };
+
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={[COLORS.background, COLORS.card, COLORS.background]} style={styles.gradient}>
+      <LinearGradient colors={[COLORS_THEME.background, COLORS_THEME.card, COLORS_THEME.background]} style={styles.gradient}>
         
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.text} />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{top:10, bottom:10, left:10, right:10}}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS_THEME.text} />
           </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>{mealType} Ekle</Text>
-            <Text style={styles.headerSubtitle}>Akıllı besin arama motoru</Text>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>{t('meals.addMealHeader')}</Text>
+            <Text style={styles.headerSubtitle}>{t(`dashboard.${mealType}`).toUpperCase()}</Text>
           </View>
+          <View style={{ width: 24 }} />
         </View>
 
-        <View style={styles.content}>
-          {/* Smart Search Bar */}
-          <View style={styles.searchWrapper}>
-            <MaterialCommunityIcons name="magnify" size={24} color={COLORS.textSecondary} style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Örn: 2 yumurta ve 1 dilim kepek ekmeği..."
-              placeholderTextColor={COLORS.textMuted}
-              value={query}
-              onChangeText={setQuery}
-              onSubmitEditing={handleSearch}
-              returnKeyType="search"
-            />
-            {query.length > 0 && (
-              <TouchableOpacity style={styles.clearBtn} onPress={() => { setQuery(''); setHasSearched(false); setResults([]); }}>
-                <MaterialCommunityIcons name="close-circle" size={20} color={COLORS.textMuted} />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity style={styles.searchActionBtn} onPress={handleSearch}>
-              <MaterialCommunityIcons name="auto-fix" size={20} color={COLORS.background} />
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color={COLORS_THEME.textSecondary} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={t('meals.searchPlaceholder')}
+            placeholderTextColor={COLORS_THEME.textSecondary}
+            value={query}
+            onChangeText={setQuery}
+          />
+          {query.length > 0 ? (
+            <TouchableOpacity onPress={() => setQuery('')}>
+              <Ionicons name="close-circle" size={20} color={COLORS_THEME.textSecondary} />
             </TouchableOpacity>
-          </View>
-
-          {/* Results / Quick Access */}
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.primary} />
-              <Text style={styles.loadingText}>Yapay zeka besin değerlerini hesaplıyor...</Text>
-            </View>
-          ) : hasSearched ? (
-            <FlatList
-              data={results}
-              keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
-              renderItem={renderFoodCard}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-              ListEmptyComponent={() => (
-                <View style={styles.emptyList}>
-                  <MaterialCommunityIcons name="food-off" size={48} color={COLORS.textMuted} />
-                  <Text style={styles.emptyListText}>Sonuç bulunamadı.</Text>
-                </View>
-              )}
-            />
           ) : (
-            renderQuickAccess()
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity onPress={handleImagePick} style={{ marginRight: 12 }}>
+                <MaterialCommunityIcons name="image-outline" size={24} color={COLORS_THEME.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={openCamera}>
+                <MaterialCommunityIcons name="barcode-scan" size={24} color={COLORS_THEME.primary} />
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
+        {/* Results */}
+        {loading ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color={COLORS_THEME.primary} />
+            <Text style={styles.loadingText}>{t('meals.aiScanning')}</Text>
+          </View>
+        ) : errorMsg ? (
+          <View style={styles.centerContainer}>
+            <Text style={styles.errorText}>{errorMsg}</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={results}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.listContent}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.resultItem} onPress={() => handleSelectFood(item)}>
+                <View style={styles.resultIcon}>
+                  <MaterialCommunityIcons name="food-apple" size={24} color={COLORS_THEME.primary} />
+                </View>
+                <View style={styles.resultInfo}>
+                  <Text style={styles.resultName}>{item.name}</Text>
+                  <Text style={styles.resultDesc}>{item.description}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={() => (
+              query.length > 2 && !loading ? (
+                <View style={styles.centerContainer}>
+                  <MaterialCommunityIcons name="food-off" size={48} color={COLORS_THEME.border} />
+                  <Text style={styles.emptyText}>{t('meals.noResults')}</Text>
+                </View>
+              ) : null
+            )}
+          />
+        )}
+
       </LinearGradient>
 
-      {/* Bottom Sheet Modal */}
-      <Modal visible={sheetVisible} transparent animationType="slide" onRequestClose={closeBottomSheet}>
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity style={styles.modalBackgroundTouchable} activeOpacity={1} onPress={closeBottomSheet} />
-          
-          <View style={styles.bottomSheet}>
-            <View style={styles.sheetHandle} />
+      {/* Modal / Bottom Sheet */}
+      {selectedFood && (
+        <Modal transparent animationType="slide" visible={!!selectedFood}>
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity style={styles.modalDismiss} onPress={() => setSelectedFood(null)} />
             
-            <View style={styles.sheetHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.sheetTitle}>{selectedFood?.name}</Text>
-                <Text style={styles.sheetSubtitle}>{selectedFood?.description}</Text>
+            <View style={styles.modalContent}>
+              <View style={styles.modalIndicator} />
+              
+              <Text style={styles.modalTitle}>{selectedFood.name}</Text>
+              
+              {/* Macros Summary */}
+              <View style={styles.macrosContainer}>
+                <View style={styles.macroBox}>
+                  <Text style={[styles.macroVal, {color: COLORS_THEME.accent}]}>{currentMacros.cals}</Text>
+                  <Text style={styles.macroLabel}>{t('meals.macros.cals')}</Text>
+                </View>
+                <View style={styles.macroBox}>
+                  <Text style={[styles.macroVal, {color: '#4ade80'}]}>{currentMacros.p}g</Text>
+                  <Text style={styles.macroLabel}>{t('meals.macros.protein')}</Text>
+                </View>
+                <View style={styles.macroBox}>
+                  <Text style={[styles.macroVal, {color: '#60a5fa'}]}>{currentMacros.c}g</Text>
+                  <Text style={styles.macroLabel}>{t('meals.macros.carbs')}</Text>
+                </View>
+                <View style={styles.macroBox}>
+                  <Text style={[styles.macroVal, {color: '#f87171'}]}>{currentMacros.f}g</Text>
+                  <Text style={styles.macroLabel}>{t('meals.macros.fat')}</Text>
+                </View>
               </View>
-              <View style={styles.sheetMacroBox}>
-                <MaterialCommunityIcons name="fire" size={16} color={COLORS.accent} />
-                <Text style={styles.sheetMacroText}>{Math.round(dynamicCalories)} kcal</Text>
-                <Text style={styles.sheetMacroSub}>Toplam</Text>
-              </View>
-            </View>
 
-            <Text style={styles.inputLabel}>Miktar ve Birim</Text>
-            <View style={styles.unitSelector}>
-              {['Gram', 'Porsiyon', 'Adet'].map((u) => {
-                if (u === 'Adet' && (!selectedFood?.pieceWeight || selectedFood.pieceWeight <= 0)) return null;
-                if (u === 'Porsiyon' && (!selectedFood?.portionWeight || selectedFood.portionWeight <= 0)) return null;
-                
-                return (
+              {/* Unit Selector */}
+              <View style={styles.unitSelector}>
+                {selectedFood.pieceWeight > 0 && (
                   <TouchableOpacity 
-                    key={u} 
-                    style={[styles.unitBtn, unit === u && styles.unitBtnActive]}
-                    onPress={() => {
-                      setUnit(u);
-                      if (u === 'Gram') setAmountInput('100');
-                      else setAmountInput('1');
-                    }}
+                    style={[styles.unitBtn, unit === 'piece' && styles.unitBtnActive]} 
+                    onPress={() => { setUnit('piece'); setAmount(1); setInputText('1'); }}
                   >
-                    <Text style={[styles.unitBtnText, unit === u && styles.unitBtnTextActive]}>{u}</Text>
+                    <Text style={[styles.unitBtnText, unit === 'piece' && styles.unitBtnTextActive]}>{t('meals.piece')}</Text>
                   </TouchableOpacity>
-                );
-              })}
-            </View>
+                )}
+                {selectedFood.portionWeight > 0 && (
+                  <TouchableOpacity 
+                    style={[styles.unitBtn, unit === 'portion' && styles.unitBtnActive]} 
+                    onPress={() => { setUnit('portion'); setAmount(1); setInputText('1'); }}
+                  >
+                    <Text style={[styles.unitBtnText, unit === 'portion' && styles.unitBtnTextActive]}>{t('meals.portion')}</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity 
+                  style={[styles.unitBtn, unit === 'gram' && styles.unitBtnActive]} 
+                  onPress={() => { setUnit('gram'); setAmount(100); setInputText('100'); }}
+                >
+                  <Text style={[styles.unitBtnText, unit === 'gram' && styles.unitBtnTextActive]}>{t('meals.gram')}</Text>
+                </TouchableOpacity>
+              </View>
 
-            <View style={{ alignItems: 'center', marginBottom: SPACING.lg }}>
-              <HorizontalSlider
-                value={parseFloat(amountInput.replace(',', '.')) || (unit === 'Gram' ? 100 : 1)}
-                min={unit === 'Gram' ? 1 : 0.5} 
-                max={unit === 'Gram' ? 1000 : 20} 
-                step={unit === 'Gram' ? 1 : 0.5}
-                onChange={(val) => setAmountInput(val.toString())}
-                color={COLORS.primary}
-                unit={unit}
-              />
-            </View>
+              {/* Slider & TextInput */}
+              <View style={styles.sliderContainer}>
+                <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md}}>
+                  <TextInput
+                    style={styles.amountInput}
+                    keyboardType="numeric"
+                    value={inputText}
+                    onChangeText={(val) => {
+                      setInputText(val);
+                      const num = parseFloat(val.replace(',', '.'));
+                      if (!isNaN(num)) {
+                        setAmount(num);
+                      } else if (val === '') {
+                        setAmount(0);
+                      }
+                    }}
+                  />
+                  <Text style={styles.amountUnitLabel}>{unit === 'gram' ? 'g' : unit === 'piece' ? t('meals.piece').split(' ')[0] : t('meals.portion')}</Text>
+                </View>
+                <Slider
+                  style={{ width: '100%', height: 40 }}
+                  minimumValue={unit === 'gram' ? 10 : 0.1}
+                  maximumValue={unit === 'gram' ? 1000 : 5}
+                  step={unit === 'gram' ? 10 : 0.1}
+                  value={amount}
+                  onValueChange={(val) => {
+                    setAmount(val);
+                    setInputText(unit === 'gram' ? val.toString() : val.toFixed(1).toString());
+                  }}
+                  minimumTrackTintColor={COLORS_THEME.primary}
+                  maximumTrackTintColor={COLORS_THEME.border}
+                  thumbTintColor={COLORS_THEME.primary}
+                />
+              </View>
 
-            <TouchableOpacity style={styles.addButton} onPress={handleAddFood} activeOpacity={0.9}>
-              <Text style={styles.addButtonText}>Günlüğe Ekle</Text>
-              <MaterialCommunityIcons name="plus-circle" size={20} color={COLORS.background} style={{ marginLeft: 8 }} />
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveMeal}>
+                <Text style={styles.saveBtnText}>{t('meals.addFood')}</Text>
+                <MaterialCommunityIcons name="check-circle" size={24} color="#0D1117" />
+              </TouchableOpacity>
+            </View>
           </View>
+        </Modal>
+      )}
+      {/* Scanner Modal */}
+      <Modal visible={showCamera} animationType="slide" onRequestClose={() => setShowCamera(false)}>
+        <View style={{ flex: 1, backgroundColor: 'black' }}>
+          <CameraView
+            style={{ flex: 1 }}
+            facing="back"
+            barcodeScannerSettings={{
+              barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "qr"],
+            }}
+            onBarcodeScanned={scanning ? undefined : handleBarcodeScanned}
+          >
+            <View style={{ flex: 1, backgroundColor: 'transparent', flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-end', paddingBottom: 40 }}>
+              <TouchableOpacity style={{ backgroundColor: 'rgba(0,0,0,0.6)', padding: 16, borderRadius: 50 }} onPress={() => setShowCamera(false)}>
+                <MaterialCommunityIcons name="close" size={32} color="white" />
+              </TouchableOpacity>
+            </View>
+          </CameraView>
         </View>
       </Modal>
 
@@ -374,173 +399,113 @@ export default function MealsScreen() {
   );
 }
 
-const getStyles = (COLORS) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const getStyles = (COLORS_THEME) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: COLORS_THEME.background },
   gradient: { flex: 1 },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: Platform.OS === 'ios' ? 50 : 40,
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-  backBtn: { padding: SPACING.xs, marginRight: SPACING.md },
-  headerTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.xl, color: COLORS.text },
-  headerSubtitle: { fontFamily: TYPOGRAPHY.fontFamily.regular, fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
-  
-  content: { flex: 1, paddingTop: SPACING.lg },
-  
-  // Search Bar
-  searchWrapper: {
+  headerTitleContainer: { alignItems: 'center' },
+  headerTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.lg, color: COLORS_THEME.text },
+  headerSubtitle: { fontFamily: TYPOGRAPHY.fontFamily.medium, fontSize: FONT_SIZE.xs, color: COLORS_THEME.primary, marginTop: 2 },
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.card,
-    marginHorizontal: SPACING.lg,
-    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: COLORS_THEME.cardLight,
+    margin: SPACING.lg,
     paddingHorizontal: SPACING.md,
-    height: 54,
+    borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    marginBottom: SPACING.xl,
-    ...SHADOWS.glow,
+    borderColor: COLORS_THEME.border,
+    height: 50,
   },
   searchIcon: { marginRight: SPACING.sm },
-  searchInput: {
-    flex: 1,
-    fontFamily: TYPOGRAPHY.fontFamily.regular,
-    fontSize: FONT_SIZE.md,
-    color: COLORS.text,
-    height: '100%',
-  },
-  clearBtn: { padding: SPACING.xs },
-  searchActionBtn: {
-    backgroundColor: COLORS.primary,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: SPACING.xs,
-  },
-
-  // Loading & Empty
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { fontFamily: TYPOGRAPHY.fontFamily.regular, color: COLORS.textSecondary, marginTop: SPACING.md },
-  emptyList: { alignItems: 'center', marginTop: 100 },
-  emptyListText: { fontFamily: TYPOGRAPHY.fontFamily.regular, color: COLORS.textSecondary, marginTop: SPACING.md },
-
-  // List
+  searchInput: { flex: 1, color: COLORS_THEME.text, fontFamily: TYPOGRAPHY.fontFamily.regular, fontSize: FONT_SIZE.md },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: SPACING.xl },
+  loadingText: { fontFamily: TYPOGRAPHY.fontFamily.medium, color: COLORS_THEME.textSecondary, marginTop: SPACING.md },
+  errorText: { fontFamily: TYPOGRAPHY.fontFamily.medium, color: COLORS_THEME.error, textAlign: 'center' },
+  emptyText: { fontFamily: TYPOGRAPHY.fontFamily.medium, color: COLORS_THEME.textSecondary, marginTop: SPACING.md },
   listContent: { paddingHorizontal: SPACING.lg, paddingBottom: 100 },
-  
-  // Card
-  foodCard: {
+  resultItem: {
     flexDirection: 'row',
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS_THEME.card,
     padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
     marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(255,255,255,0.03)',
     alignItems: 'center',
+    ...SHADOWS.card,
   },
-  foodInfo: { flex: 1, marginRight: SPACING.md },
-  foodName: { fontFamily: TYPOGRAPHY.fontFamily.bold, color: COLORS.text, fontSize: FONT_SIZE.md, marginBottom: 2 },
-  foodDesc: { fontFamily: TYPOGRAPHY.fontFamily.regular, color: COLORS.textMuted, fontSize: 11, marginBottom: SPACING.sm },
-  
-  macroBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4 },
-  badgeText: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 9 },
-
-  addIconContainer: {
+  resultIcon: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(64,192,87,0.1)',
+    backgroundColor: 'rgba(151, 104, 217, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(64,192,87,0.3)',
-  },
-
-  // Quick Access
-  quickAccessSection: { paddingHorizontal: SPACING.lg, marginTop: SPACING.md },
-  sectionTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, color: COLORS.text, fontSize: FONT_SIZE.md, marginBottom: SPACING.md },
-  quickCard: {
-    width: 110,
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.md,
     marginRight: SPACING.md,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
-  quickIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(64,192,87,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
-  quickCardName: { fontFamily: TYPOGRAPHY.fontFamily.bold, color: COLORS.text, fontSize: 11, textAlign: 'center', marginBottom: 2 },
-  quickCardCals: { fontFamily: TYPOGRAPHY.fontFamily.regular, color: COLORS.textSecondary, fontSize: 10 },
-
-  // Bottom Sheet
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
-  modalBackgroundTouchable: { flex: 1 },
-  bottomSheet: {
-    backgroundColor: COLORS.card,
-    borderTopLeftRadius: BORDER_RADIUS.xl,
-    borderTopRightRadius: BORDER_RADIUS.xl,
+  resultInfo: { flex: 1 },
+  resultName: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.md, color: COLORS_THEME.text, marginBottom: 4 },
+  resultDesc: { fontFamily: TYPOGRAPHY.fontFamily.regular, fontSize: FONT_SIZE.xs, color: COLORS_THEME.textSecondary },
+  
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  modalDismiss: { flex: 1 },
+  modalContent: {
+    backgroundColor: COLORS_THEME.card,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     padding: SPACING.xl,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    paddingBottom: Platform.OS === 'ios' ? 40 : SPACING.xl,
+    borderWidth: 1,
+    borderColor: COLORS_THEME.border,
   },
-  sheetHandle: { width: 40, height: 4, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 2, alignSelf: 'center', marginBottom: SPACING.lg },
+  modalIndicator: { width: 40, height: 4, backgroundColor: COLORS_THEME.border, borderRadius: 2, alignSelf: 'center', marginBottom: SPACING.lg },
+  modalTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.xl, color: COLORS_THEME.text, textAlign: 'center', marginBottom: SPACING.xl },
   
-  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xl },
-  sheetTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, color: COLORS.text, fontSize: FONT_SIZE.lg },
-  sheetSubtitle: { fontFamily: TYPOGRAPHY.fontFamily.regular, color: COLORS.textMuted, fontSize: FONT_SIZE.sm, marginTop: 2 },
-  sheetMacroBox: { alignItems: 'flex-end' },
-  sheetMacroText: { fontFamily: TYPOGRAPHY.fontFamily.bold, color: COLORS.accent, fontSize: FONT_SIZE.md },
-  sheetMacroSub: { fontFamily: TYPOGRAPHY.fontFamily.regular, color: COLORS.textMuted, fontSize: 10 },
-
-  inputLabel: { fontFamily: TYPOGRAPHY.fontFamily.bold, color: COLORS.textSecondary, fontSize: FONT_SIZE.sm, marginBottom: SPACING.md },
+  macrosContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.xl, paddingHorizontal: SPACING.md },
+  macroBox: { alignItems: 'center' },
+  macroVal: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.xl, marginBottom: 4 },
+  macroLabel: { fontFamily: TYPOGRAPHY.fontFamily.medium, fontSize: FONT_SIZE.xs, color: COLORS_THEME.textSecondary },
   
-  unitSelector: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: BORDER_RADIUS.md, padding: 4, marginBottom: SPACING.xl },
+  unitSelector: { flexDirection: 'row', backgroundColor: COLORS_THEME.background, borderRadius: BORDER_RADIUS.md, padding: 4, marginBottom: SPACING.xl },
   unitBtn: { flex: 1, paddingVertical: SPACING.sm, alignItems: 'center', borderRadius: BORDER_RADIUS.sm },
-  unitBtnActive: { backgroundColor: COLORS.primary },
-  unitBtnText: { fontFamily: TYPOGRAPHY.fontFamily.bold, color: COLORS.textMuted, fontSize: FONT_SIZE.sm },
-  unitBtnTextActive: { color: COLORS.background },
-
-  inputContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.xxl },
+  unitBtnActive: { backgroundColor: COLORS_THEME.cardLight, ...SHADOWS.card },
+  unitBtnText: { fontFamily: TYPOGRAPHY.fontFamily.medium, color: COLORS_THEME.textSecondary },
+  unitBtnTextActive: { color: COLORS_THEME.text },
+  
+  sliderContainer: { alignItems: 'center', marginBottom: SPACING.xxl },
   amountInput: {
     fontFamily: TYPOGRAPHY.fontFamily.bold,
-    fontSize: 48,
-    color: COLORS.text,
-    borderBottomWidth: 2,
-    borderColor: COLORS.primary,
-    minWidth: 100,
-    textAlign: 'center',
-    paddingVertical: 0,
+    fontSize: 32,
+    color: COLORS_THEME.primary,
+    minWidth: 60,
+    textAlign: 'right',
+    padding: 0,
+    marginRight: 8,
   },
-  amountUnit: { fontFamily: TYPOGRAPHY.fontFamily.bold, color: COLORS.textSecondary, fontSize: FONT_SIZE.lg, marginLeft: SPACING.sm, marginTop: 15 },
-
-  addButton: {
+  amountUnitLabel: {
+    fontFamily: TYPOGRAPHY.fontFamily.bold,
+    fontSize: 24,
+    color: COLORS_THEME.primary,
+  },
+  
+  saveBtn: {
     flexDirection: 'row',
-    backgroundColor: COLORS.primary,
-    borderRadius: BORDER_RADIUS.lg,
-    paddingVertical: SPACING.lg,
+    backgroundColor: COLORS_THEME.primary,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.full,
     justifyContent: 'center',
     alignItems: 'center',
     ...SHADOWS.glow,
   },
-  addButtonText: { fontFamily: TYPOGRAPHY.fontFamily.bold, color: COLORS.background, fontSize: FONT_SIZE.md },
+  saveBtnText: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.md, color: '#0D1117', marginRight: 8 },
 });

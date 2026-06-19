@@ -1,7 +1,10 @@
 import { Pedometer } from 'expo-sensors';
+import * as Device from 'expo-device';
 import { useUserStore } from '../store/userStore';
 
 export const initHealthIntegration = async () => {
+
+
   const { status } = await Pedometer.requestPermissionsAsync();
   if (status !== 'granted') {
     console.log('[Health] Pedometer permission denied!');
@@ -12,6 +15,8 @@ export const initHealthIntegration = async () => {
 
 export const fetchDailyStepsAndCalories = async () => {
   try {
+
+
     const isAvailable = await Pedometer.isAvailableAsync();
     if (!isAvailable) return { steps: 0, calories: 0 };
 
@@ -55,6 +60,8 @@ export const syncHealthDataToStore = async () => {
 
 export const fetchStepHistory = async (days = 7) => {
   try {
+
+
     const isAvailable = await Pedometer.isAvailableAsync();
     if (!isAvailable) return [];
 

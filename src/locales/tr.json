@@ -117,6 +117,7 @@
     "breakfast": "Kahvaltı",
     "lunch": "Öğle",
     "dinner": "Akşam",
+    "snack": "Atıştırmalık",
     "noWorkout": "Bugün antrenman yapılmadı",
     "firstMeal": "İlk Öğün (Öğle)",
     "lastMeal": "Son Öğün (Akşam)",
@@ -144,14 +145,22 @@
   "meals": {
     "title": "Yemek Ara",
     "searchPlaceholder": "Yemek arayın...",
-    "noResults": "Sonuç bulunamadı",
+    "noResults": "Sonuç bulunamadı.",
     "amount": "Miktar",
     "gram": "Gram",
     "portion": "Porsiyon",
-    "piece": "Adet",
-    "addFood": "Besin Ekle",
-    "aiError": "Yapay Zeka Hatası",
-    "tryAgain": "Lütfen tekrar deneyin."
+    "piece": "Adet / Kutu",
+    "addFood": "Öğünü Kaydet",
+    "aiError": "Besin aranırken bir hata oluştu. Lütfen tekrar deneyin.",
+    "tryAgain": "Lütfen tekrar deneyin.",
+    "addMealHeader": "Öğün Ekle",
+    "aiScanning": "Yapay zeka veritabanı taranıyor...",
+    "macros": {
+      "cals": "KCAL",
+      "protein": "Protein",
+      "carbs": "Karb.",
+      "fat": "Yağ"
+    }
   },
   "workouts": {
     "title": "Antrenmanlar",
@@ -178,7 +187,33 @@
     "exercisesCount": "{{count}} egzersiz",
     "startNow": "Antrenmana Başla",
     "fillRequiredFields": "Lütfen tüm alanları doldurun.",
-    "workoutLogged": "Antrenman başarıyla kaydedildi!"
+    "workoutLogged": "Antrenman başarıyla kaydedildi!",
+    "aiCalculateAndSave": "Yapay Zeka ile Hesapla ve Kaydet",
+    "aiWorkoutCompletedToday": "Bugünkü Antrenman Tamamlandı",
+    "sets": "Set",
+    "reps": "Tekrar",
+    "custom": {
+      "exerciseAdded": "Özel hareket eklendi!",
+      "routineNameRequired": "Lütfen programa bir isim verin!",
+      "minOneExerciseRequired": "En az 1 hareket seçmelisin!",
+      "routineSaved": "Program başarıyla kaydedildi!",
+      "routineTitlePlaceholder": "Özel Antrenmanım",
+      "customExerciseNamePlaceholder": "Örn: Amuda Kalkarak Şınav",
+      "addExerciseBtn": "Hareket Seç",
+      "saveRoutineBtn": "KAYDET",
+      "startRoutineBtn": "BAŞLA",
+      "setLabel": "Set",
+      "repLabel": "Tekrar",
+      "weightLabel": "Ağırlık",
+      "restLabel": "Dinlenme",
+      "secLabel": "sn",
+      "routineNameLabel": "PROGRAM ADI",
+      "exercisesLabel": "Hareketler ({{count}})",
+      "noExercisesYet": "Henüz hareket eklemedin.",
+      "newRoutineTitle": "Yeni Program",
+      "addCustomLabel": "Özel Hareket Ekle",
+      "addBtn": "Ekle"
+    }
   },
   "quests": {
     "title": "Günlük Hedefler",
@@ -199,7 +234,39 @@
     "workoutGoalDesc": "Bugün en az bir antrenman yap veya kaydet",
     "levelLabel": "Seviye {{level}}",
     "xpToGo": "Seviye atlamak için {{xp}} XP kaldı",
-    "congratsLeveledUp": "Tebrikler! Seviye atladın!"
+    "congratsLeveledUp": "Tebrikler! Seviye atladın!",
+    "dynamic": {
+      "water_1_5l": { "title": "Susuz Kalma", "desc": "Bugün en az 1.5 litre su iç." },
+      "water_2l": { "title": "Su Hedefi", "desc": "Metabolizmanı hızlandırmak için 2 litre su iç." },
+      "water_2_5l": { "title": "Hidrasyon Ustası", "desc": "Bugün 2.5 litre su içerek sınırları zorla." },
+      "water_3l": { "title": "Su Şampiyonu", "desc": "Kasların ve bedenin için 3 litre su iç." },
+      "protein_80g": { "title": "Protein Başlangıcı", "desc": "Bugün en az 80g protein tüket." },
+      "protein_100g": { "title": "Kas İnşası", "desc": "Gelişimi desteklemek için 100g protein tüket." },
+      "protein_120g": { "title": "Gerçek Güç", "desc": "Bugün 120g protein hedefini tuttur." },
+      "protein_150g": { "title": "Vücut Geliştirici", "desc": "Zorlu bir hedef: 150g protein tüket!" },
+      "protein_target": { "title": "Protein Hedefi", "desc": "Günlük kişisel protein hedefine ulaş." },
+      "cals_under_target": { "title": "Kalori Bütçesi", "desc": "Günlük kalori bütçeni aşmadan günü tamamla." },
+      "cals_burn_200": { "title": "Isınma Turu", "desc": "Antrenmanlarla en az 200 kcal yak." },
+      "cals_burn_400": { "title": "Ter Atma", "desc": "Bugün aktif olarak 400 kcal yak." },
+      "cals_burn_600": { "title": "Sınırları Zorla", "desc": "Gerçek bir kahraman gibi 600 kcal yak!" },
+      "carbs_target": { "title": "Karbonhidrat Dengesi", "desc": "Günlük karbonhidrat limitini aşma." },
+      "fat_target": { "title": "Sağlıklı Yağlar", "desc": "Günlük yağ limitini doğru ayarla." },
+      "workout_1": { "title": "Günün Antrenmanı", "desc": "Bugün en az 1 antrenman tamamla." },
+      "workout_2": { "title": "Çifte Güç", "desc": "Bugün 2 farklı antrenman tamamla." },
+      "workout_ai": { "title": "Yapay Zeka Antrenmanı", "desc": "Yapay Zeka'nın sana özel hazırladığı programı tamamla." },
+      "steps_3k": { "title": "Kısa Bir Yürüyüş", "desc": "Günde 3.000 adım at." },
+      "steps_5k": { "title": "Hareket Zamanı", "desc": "Günde 5.000 adım at." },
+      "steps_8k": { "title": "Aktif Bir Gün", "desc": "Günde 8.000 adım hedefine ulaş." },
+      "steps_10k": { "title": "10 Bin Adım", "desc": "Klasik hedefe ulaş: 10.000 adım!" },
+      "steps_12k": { "title": "Yürüyüş Ustası", "desc": "Bugün tam 12.000 adım at." },
+      "steps_15k": { "title": "Maratoncu", "desc": "15.000 adım atarak efsane ol!" },
+      "log_breakfast": { "title": "Güne Başlarken", "desc": "Bugün kahvaltını sisteme kaydet." },
+      "log_lunch": { "title": "Enerji Molası", "desc": "Öğle yemeğini sisteme kaydet." },
+      "log_dinner": { "title": "Akşam Ziyafeti", "desc": "Akşam yemeğini sisteme kaydet." },
+      "log_snack": { "title": "Küçük Bir Ara", "desc": "Bugün yediğin bir atıştırmalığı kaydet." },
+      "fast_start": { "title": "İrade Sınavı", "desc": "Aralıklı oruç sayacını başlat." },
+      "streak_3": { "title": "İstikrar", "desc": "Art arda 3 günlük seriye ulaş." }
+    }
   },
   "profile": {
     "title": "Profil",
@@ -227,6 +294,12 @@
     "replayTutorial": "Rehberi Tekrarla",
     "logout": "Çıkış Yap",
     "version": "QuestFit v1.0"
+  },
+  "workoutHistory": {
+    "title": "Antrenman Geçmişi",
+    "movements": "Hareket",
+    "more": "daha...",
+    "noHistory": "Henüz antrenman geçmişi yok."
   },
   "diet": {
     "title": "Diyet Planı Seçimi",

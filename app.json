@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splash.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#FFFFFF"
     },
@@ -24,17 +24,32 @@
       "package": "com.anonymous.QuestFit",
       "permissions": [
         "INTERNET",
-        "ACTIVITY_RECOGNITION"
+        "ACTIVITY_RECOGNITION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
       ],
       "usesCleartextTraffic": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.jpg"
     },
     "plugins": [
       "expo-font",
       "expo-localization",
       "expo-dev-client",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "QuestFit needs access to your camera to scan barcodes and food."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "QuestFit needs access to your photos to analyze food images."
+        }
+      ],
       [
         "expo-notifications",
         {

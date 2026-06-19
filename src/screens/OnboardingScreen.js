@@ -144,9 +144,9 @@ export default function OnboardingScreen({ navigation }) {
   const renderBodyTypeStep = () => {
     const isFemale = formData.gender === 'female';
     const bodyTypes = [
-      { id: 'ectomorph', title: t('onboarding.ectomorph'), icon: isFemale ? require('../../assets/body_ecto_female.png') : require('../../assets/body_ecto_male.png'), desc: t('onboarding.ectoDesc') },
-      { id: 'mesomorph', title: t('onboarding.mesomorph'), icon: isFemale ? require('../../assets/body_meso_female.png') : require('../../assets/body_meso_male.png'), desc: t('onboarding.mesoDesc') },
-      { id: 'endomorph', title: t('onboarding.endomorph'), icon: isFemale ? require('../../assets/body_endo_female.png') : require('../../assets/body_endo_male.png'), desc: t('onboarding.endoDesc') }
+      { id: 'ectomorph', title: t('onboarding.ectomorph'), icon: isFemale ? require('../../assets/body_ecto_female.jpg') : require('../../assets/body_ecto_male.jpg'), desc: t('onboarding.ectoDesc') },
+      { id: 'mesomorph', title: t('onboarding.mesomorph'), icon: isFemale ? require('../../assets/body_meso_female.jpg') : require('../../assets/body_meso_male.jpg'), desc: t('onboarding.mesoDesc') },
+      { id: 'endomorph', title: t('onboarding.endomorph'), icon: isFemale ? require('../../assets/body_endo_female.jpg') : require('../../assets/body_endo_male.jpg'), desc: t('onboarding.endoDesc') }
     ];
 
     return (

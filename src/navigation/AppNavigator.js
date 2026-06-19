@@ -6,11 +6,12 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from '../screens/LoginScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import MainTabs from './MainTabs';
-import MealsScreen from '../screens/MealsScreen';
 import NewCustomWorkoutScreen from '../screens/NewCustomWorkoutScreen';
 import ActiveWorkoutScreen from '../screens/ActiveWorkoutScreen';
 import SplashScreen from '../screens/SplashScreen';
 import StatsScreen from '../screens/StatsScreen';
+import WorkoutHistoryScreen from '../screens/WorkoutHistoryScreen';
+import MealsScreen from '../screens/MealsScreen';
 
 import { useAuth } from '../context/AuthContext';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -63,11 +64,12 @@ export default function AppNavigator() {
           // Giriş yapılmış + profil var → MainTabs (Ana menü)
           <>
             <Stack.Screen name="MainTabs" component={MainTabs} />
-            <Stack.Screen name="Meals" component={MealsScreen} />
             <Stack.Screen name="CustomWorkout" component={NewCustomWorkoutScreen} />
 
             <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} />
             <Stack.Screen name="Stats" component={StatsScreen} />
+            <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />
+            <Stack.Screen name="Meals" component={MealsScreen} />
           </>
         )}
       </Stack.Navigator>

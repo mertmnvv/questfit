@@ -9,6 +9,7 @@ import {
   Modal,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +23,7 @@ import { COLORS, SPACING, FONT_SIZE, BORDER_RADIUS, SHADOWS, TYPOGRAPHY } from '
 import MuscleHeatmap from '../components/MuscleHeatmap';
 import { EXERCISE_DATABASE } from '../data/exercises';
 import HorizontalSlider from '../components/HorizontalSlider';
+import { searchWorkout } from '../services/workoutService';
 
 const { width } = Dimensions.get('window');
 
@@ -46,7 +48,7 @@ export default function WorkoutsScreen() {
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [quickLogName, setQuickLogName] = useState('');
   const [quickLogDuration, setQuickLogDuration] = useState('');
-  const [quickLogCalories, setQuickLogCalories] = useState('');
+  const [isLogging, setIsLogging] = useState(false);
 
   // 1. Muscle Fatigue Calculation
   const fatigueData = useMemo(() => getMuscleFatigue() || { chest: 0, back: 0, legs: 0, arms: 0, core: 0 }, [getMuscleFatigue, workoutHistory]);
@@ -220,9 +222,9 @@ export default function WorkoutsScreen() {
     });
   };
 
-  // Quick log activity
-  const handleQuickLog = () => {
-    if (!quickLogName.trim() || !quickLogDuration || !quickLogCalories) {
+  // Quick log activity via AI
+  const handleQuickLog = async () => {
+    if (!quickLogName.trim() || !quickLogDuration) {
       Toast.show({
         type: 'error',
         text1: t('common.error'),
@@ -234,38 +236,54 @@ export default function WorkoutsScreen() {
     }
 
     const duration = parseInt(quickLogDuration);
-    const calories = parseInt(quickLogCalories);
 
-    if (isNaN(duration) || isNaN(calories) || duration <= 0 || calories <= 0) {
+    if (isNaN(duration) || duration <= 0) {
       Toast.show({
         type: 'error',
         text1: t('common.error'),
-        text2: 'Please enter positive valid numbers.',
+        text2: 'Lütfen geçerli bir süre girin.',
         position: 'top',
         topOffset: 60,
       });
       return;
     }
 
-    // Call store action
-    addWorkout({
-      name: quickLogName.trim(),
-      burnedCalories: calories,
-      exercises: [{ name: quickLogName.trim(), muscleGroup: 'Full Body', defaultSets: 1, defaultReps: duration, burnedCalsPerSet: calories }],
-    });
+    setIsLogging(true);
+    try {
+      const query = `${duration} Dk ${quickLogName.trim()}`;
+      const weight = profile?.weight || 75;
+      const results = await searchWorkout(query, weight);
+      
+      const bestResult = results && results.length > 0 ? results[0] : null;
+      const calculatedCalories = bestResult ? Math.round(bestResult.burnedCalories) : duration * 6; // fallback
+      
+      addWorkout({
+        name: quickLogName.trim(),
+        burnedCalories: calculatedCalories,
+        exercises: [{ name: quickLogName.trim(), muscleGroup: 'Kardiyo/Aktif', defaultSets: 1, defaultReps: duration, burnedCalsPerSet: calculatedCalories }],
+      });
 
-    Toast.show({
-      type: 'success',
-      text1: t('common.success'),
-      text2: t('workouts.workoutLogged'),
-      position: 'top',
-      topOffset: 60,
-    });
+      Toast.show({
+        type: 'success',
+        text1: t('common.success'),
+        text2: `${quickLogName.trim()} kaydedildi! AI Tahmini: ~${calculatedCalories} kcal.`,
+        position: 'top',
+        topOffset: 60,
+      });
 
-    // Reset inputs
-    setQuickLogName('');
-    setQuickLogDuration('');
-    setQuickLogCalories('');
+      setQuickLogName('');
+      setQuickLogDuration('');
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: t('common.error'),
+        text2: 'Yapay Zeka kalori hesaplarken bir hata oluştu.',
+        position: 'top',
+        topOffset: 60,
+      });
+    } finally {
+      setIsLogging(false);
+    }
   };
 
   return (
@@ -280,17 +298,25 @@ export default function WorkoutsScreen() {
               {t('common.back') === 'Geri' ? 'Günlük egzersizlerini ve planlarını yönet' : 'Manage your routines & daily fitness plan'}
             </Text>
           </View>
-          
-          {/* Location Pill */}
-          <TouchableOpacity
-            style={styles.locationPill}
-            onPress={() => setLocationModalVisible(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name={workoutLocation === 'Gym' ? 'barbell' : 'home'} size={14} color={COLORS_THEME.primary} />
-            <Text style={styles.locationText}>{getLocationLabel(workoutLocation)}</Text>
-            <MaterialCommunityIcons name="chevron-down" size={16} color={COLORS_THEME.primary} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity
+              style={[styles.locationPill, { marginRight: SPACING.sm }]}
+              onPress={() => setLocationModalVisible(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name={workoutLocation === 'Gym' ? 'barbell' : 'home'} size={14} color={COLORS_THEME.primary} />
+              <Text style={styles.locationText}>{getLocationLabel(workoutLocation)}</Text>
+              <MaterialCommunityIcons name="chevron-down" size={16} color={COLORS_THEME.primary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.historyBtn} 
+              onPress={() => navigation.navigate('WorkoutHistory')}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="history" size={24} color={COLORS_THEME.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -332,8 +358,8 @@ export default function WorkoutsScreen() {
                       <Text style={styles.exerciseTarget}>{ex.muscleGroup} • {ex.subGroup}</Text>
                     </View>
                     <View style={styles.exerciseSpecs}>
-                      <Text style={styles.exerciseSets}>{ex.defaultSets} Sets</Text>
-                      <Text style={styles.exerciseReps}>{ex.defaultReps} Reps</Text>
+                      <Text style={styles.exerciseSets}>{ex.defaultSets} {t('workouts.sets')}</Text>
+                      <Text style={styles.exerciseReps}>{ex.defaultReps} {t('workouts.reps')}</Text>
                     </View>
                   </View>
                 ))}
@@ -342,7 +368,7 @@ export default function WorkoutsScreen() {
               {/* Start Workout Button */}
               {consumedToday?.aiWorkoutCompletedToday ? (
                 <View style={[styles.startButton, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
-                  <Text style={[styles.startButtonText, { color: COLORS_THEME.textSecondary }]}>{t('common.back') === 'Geri' ? 'Bugünkü Antrenman Tamamlandı' : "Today's Workout Completed"}</Text>
+                  <Text style={[styles.startButtonText, { color: COLORS_THEME.textSecondary }]}>{t('workouts.aiWorkoutCompletedToday')}</Text>
                   <MaterialCommunityIcons name="check-circle" size={18} color={COLORS_THEME.textSecondary} />
                 </View>
               ) : (
@@ -486,24 +512,18 @@ export default function WorkoutsScreen() {
                   />
                 </View>
               </View>
-              <View style={styles.rowInputs}>
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                  <HorizontalSlider
-                    title={t('workouts.calsBurned')}
-                    value={parseInt(quickLogCalories, 10) || 150}
-                    min={10} max={1500} step={10}
-                    onChange={(val) => setQuickLogCalories(val.toString())}
-                    color={COLORS_THEME.accent} unit="kcal" showButtons={true}
-                  />
-                </View>
-              </View>
 
               <TouchableOpacity
-                style={styles.logSubmitButton}
+                style={[styles.logSubmitButton, isLogging && { opacity: 0.7 }]}
                 onPress={handleQuickLog}
                 activeOpacity={0.8}
+                disabled={isLogging}
               >
-                <Text style={styles.logSubmitText}>{t('workouts.saveLog')}</Text>
+                {isLogging ? (
+                  <ActivityIndicator size="small" color={COLORS_THEME.primary} />
+                ) : (
+                  <Text style={styles.logSubmitText}>{t('workouts.aiCalculateAndSave')}</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -609,6 +629,14 @@ const getStyles = (COLORS_THEME) => StyleSheet.create({
     fontSize: 11,
     color: COLORS_THEME.text,
     marginHorizontal: 4,
+  },
+  historyBtn: {
+    backgroundColor: COLORS_THEME.card,
+    borderWidth: 1,
+    borderColor: COLORS_THEME.border,
+    padding: SPACING.xs,
+    borderRadius: BORDER_RADIUS.full,
+    ...SHADOWS.card,
   },
   scrollContent: {
     padding: SPACING.lg,

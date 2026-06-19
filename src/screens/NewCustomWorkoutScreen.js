@@ -12,7 +12,10 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { useUserStore } from '../store/userStore';
 import HorizontalSlider from '../components/HorizontalSlider';
 
+import { useTranslation } from 'react-i18next';
+
 export default function NewCustomWorkoutScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const COLORS = useThemeColors();
   const styles = useMemo(() => getStyles(COLORS), [COLORS]);
@@ -69,7 +72,7 @@ export default function NewCustomWorkoutScreen() {
     
     setSelectedExercises(prev => [...prev, newCustomEx]);
     setCustomExerciseName('');
-    Toast.show({ type: 'success', text1: 'Özel hareket eklendi!' });
+    Toast.show({ type: 'success', text1: t('workouts.custom.exerciseAdded') });
   };
 
   const getValidExercises = () => {
@@ -84,23 +87,23 @@ export default function NewCustomWorkoutScreen() {
 
   const handleSaveRoutine = () => {
     if (!routineName.trim()) {
-      Toast.show({ type: 'error', text1: 'Lütfen programa bir isim verin!' });
+      Toast.show({ type: 'error', text1: t('workouts.custom.routineNameRequired') });
       return;
     }
     saveCustomRoutine(routineName.trim(), getValidExercises());
-    Toast.show({ type: 'success', text1: 'Program başarıyla kaydedildi!' });
+    Toast.show({ type: 'success', text1: t('workouts.custom.routineSaved') });
     navigation.goBack();
   };
 
   const handleStartCustomWorkout = () => {
     if (selectedExercises.length === 0) {
-      Toast.show({ type: 'error', text1: 'En az 1 hareket seçmelisin!' });
+      Toast.show({ type: 'error', text1: t('workouts.custom.minOneExerciseRequired') });
       return;
     }
     
     navigation.navigate('ActiveWorkout', { 
       exercises: getValidExercises(), 
-      title: routineName.trim() || 'Özel Antrenmanım' 
+      title: routineName.trim() || t('workouts.custom.routineTitlePlaceholder')
     });
   };
 
@@ -136,7 +139,7 @@ export default function NewCustomWorkoutScreen() {
             {/* Set & Tekrar Row */}
             <View style={styles.compactRow}>
               <View style={styles.compactItem}>
-                <Text style={styles.compactLabel}>Set</Text>
+                <Text style={styles.compactLabel}>{t('workouts.custom.setLabel')}</Text>
                 <View style={styles.stepperBox}>
                   <TouchableOpacity onPress={() => updateSetRep(item.id, 'customSets', Math.max(1, (parseFloat(item.customSets || item.defaultSets || 3)) - 1))} style={styles.stepperBtn}>
                     <MaterialCommunityIcons name="minus" size={14} color={COLORS.text} />
@@ -151,7 +154,7 @@ export default function NewCustomWorkoutScreen() {
               <View style={styles.compactDivider} />
 
               <View style={styles.compactItem}>
-                <Text style={styles.compactLabel}>Tekrar</Text>
+                <Text style={styles.compactLabel}>{t('workouts.custom.repLabel')}</Text>
                 <View style={styles.stepperBox}>
                   <TouchableOpacity onPress={() => updateSetRep(item.id, 'customReps', Math.max(1, (parseFloat(item.customReps || item.defaultReps || 10)) - 1))} style={styles.stepperBtn}>
                     <MaterialCommunityIcons name="minus" size={14} color={COLORS.text} />
@@ -169,7 +172,7 @@ export default function NewCustomWorkoutScreen() {
             {/* Ağırlık & Dinlenme Row */}
             <View style={styles.compactRow}>
               <View style={styles.compactItem}>
-                <Text style={styles.compactLabel}>Ağırlık</Text>
+                <Text style={styles.compactLabel}>{t('workouts.custom.weightLabel')}</Text>
                 <View style={styles.stepperBox}>
                   <TouchableOpacity onPress={() => updateSetRep(item.id, 'targetWeight', Math.max(0, (parseFloat(item.targetWeight || 0)) - 2.5))} style={styles.stepperBtn}>
                     <MaterialCommunityIcons name="minus" size={14} color={COLORS.text} />
@@ -187,14 +190,14 @@ export default function NewCustomWorkoutScreen() {
               <View style={styles.compactDivider} />
 
               <View style={styles.compactItem}>
-                <Text style={styles.compactLabel}>Dinlenme</Text>
+                <Text style={styles.compactLabel}>{t('workouts.custom.restLabel')}</Text>
                 <View style={styles.stepperBox}>
                   <TouchableOpacity onPress={() => updateSetRep(item.id, 'restTimeSec', Math.max(0, (parseFloat(item.restTimeSec || 60)) - 15))} style={styles.stepperBtn}>
                     <MaterialCommunityIcons name="minus" size={14} color={COLORS.text} />
                   </TouchableOpacity>
                   <View style={styles.inputWithUnit}>
                     <TextInput style={styles.stepperValInput} keyboardType="numeric" value={String(item.restTimeSec !== undefined ? item.restTimeSec : 60)} onChangeText={(v) => updateSetRep(item.id, 'restTimeSec', v)} />
-                    <Text style={styles.stepperUnit}>sn</Text>
+                    <Text style={styles.stepperUnit}>{t('workouts.custom.secLabel')}</Text>
                   </View>
                   <TouchableOpacity onPress={() => updateSetRep(item.id, 'restTimeSec', (parseFloat(item.restTimeSec || 60) || 0) + 15)} style={styles.stepperBtn}>
                     <MaterialCommunityIcons name="plus" size={14} color={COLORS.text} />
@@ -211,21 +214,21 @@ export default function NewCustomWorkoutScreen() {
 
   const renderHeader = () => (
     <View style={styles.routineNameContainer}>
-      <Text style={styles.inputLabel}>PROGRAM ADI</Text>
+      <Text style={styles.inputLabel}>{t('workouts.custom.routineNameRequired')}</Text>
       <TextInput
         style={styles.routineNameInput}
-        placeholder="Örn: Sırt ve Biceps"
+        placeholder={t('workouts.custom.routineTitlePlaceholder')}
         placeholderTextColor={COLORS.textMuted}
         value={routineName}
         onChangeText={setRoutineName}
       />
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Hareketler ({selectedExercises.length})</Text>
+        <Text style={styles.sectionTitle}>{t('workouts.custom.exercisesLabel', { count: selectedExercises.length })}</Text>
       </View>
       {selectedExercises.length === 0 && (
         <View style={styles.emptyContainer}>
           <MaterialCommunityIcons name="drag-horizontal-variant" size={48} color={COLORS.border} />
-          <Text style={styles.emptyText}>Henüz hareket eklemedin.</Text>
+          <Text style={styles.emptyText}>{t('workouts.custom.noExercisesYet')}</Text>
         </View>
       )}
     </View>
@@ -241,7 +244,7 @@ export default function NewCustomWorkoutScreen() {
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{top:10, bottom:10, left:10, right:10}}>
               <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.text} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Yeni Program</Text>
+            <Text style={styles.headerTitle}>{t('workouts.custom.newRoutineTitle')}</Text>
             <View style={{ width: 24 }} />
           </View>
         </SafeAreaView>
@@ -253,7 +256,7 @@ export default function NewCustomWorkoutScreen() {
             onDragEnd={({ data }) => setSelectedExercises(data)}
             keyExtractor={(item) => item.key || item.id}
             renderItem={renderExerciseItem}
-            ListHeaderComponent={renderHeader}
+            ListHeaderComponent={renderHeader()}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           />
@@ -263,7 +266,7 @@ export default function NewCustomWorkoutScreen() {
         <View style={styles.addExerciseWrapper}>
           <TouchableOpacity style={styles.bigAddButton} onPress={() => setModalVisible(true)} activeOpacity={0.9}>
             <MaterialCommunityIcons name="plus" size={24} color={COLORS.background} />
-            <Text style={styles.bigAddButtonText}>Hareket Seç</Text>
+            <Text style={styles.bigAddButtonText}>{t('workouts.custom.addExerciseBtn')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -275,7 +278,7 @@ export default function NewCustomWorkoutScreen() {
             disabled={selectedExercises.length === 0}
           >
             <MaterialCommunityIcons name="content-save" size={20} color={COLORS.primary} style={{ marginRight: 6 }} />
-            <Text style={styles.saveBtnText}>KAYDET</Text>
+            <Text style={styles.saveBtnText}>{t('workouts.custom.saveRoutineBtn')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -284,7 +287,7 @@ export default function NewCustomWorkoutScreen() {
             disabled={selectedExercises.length === 0}
           >
             <MaterialCommunityIcons name="play" size={20} color={COLORS.background} style={{ marginRight: 4 }} />
-            <Text style={styles.startBtnText}>BAŞLA</Text>
+            <Text style={styles.startBtnText}>{t('workouts.custom.startRoutineBtn')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -294,16 +297,16 @@ export default function NewCustomWorkoutScreen() {
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
         <View style={[styles.modalSafeArea, { paddingTop: Platform.OS === 'android' ? 20 : 0 }]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Hareket Ekle</Text>
-            <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalDoneBtn} hitSlop={{top: 20, bottom: 20, left: 20, right: 20}}>
-              <Text style={styles.modalDoneText}>Bitti</Text>
+            <Text style={styles.modalTitle}>{t('workouts.custom.addExerciseModalTitle')}</Text>
+            <TouchableOpacity onPress={() => setModalVisible(false)} hitSlop={{top:10, bottom:10, left:10, right:10}}>
+              <MaterialCommunityIcons name="close" size={24} color={COLORS.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.customInputContainer}>
             <TextInput
               style={styles.customInput}
-              placeholder="Listede yoksa buraya yazıp ekle..."
+              placeholder={t('workouts.custom.customExerciseNamePlaceholder')}
               placeholderTextColor={COLORS.textMuted}
               value={customExerciseName}
               onChangeText={setCustomExerciseName}

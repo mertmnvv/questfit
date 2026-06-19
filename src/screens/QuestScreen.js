@@ -36,6 +36,11 @@ export default function QuestScreen() {
     dailyLog,
     claimedGoals,
     claimGoal,
+    equippedItems,
+    dailyQuests,
+    fastingState,
+    streak,
+    stepHistory,
   } = useUserStore();
 
   // Modal Level-Up State
@@ -53,71 +58,112 @@ export default function QuestScreen() {
 
   // Targets and calculations
   const waterTargetL = parseFloat(profile?.waterTarget || 2.0);
-  const waterTargetGlasses = Math.ceil(waterTargetL * 4); // 1 glass = 250ml = 0.25L
+  const waterTargetGlasses = Math.ceil(waterTargetL * 4);
   const waterCurrentGlasses = consumedToday?.water || 0;
   const waterCurrentL = waterCurrentGlasses * 0.25;
 
-  const calorieTarget = Math.round(stats?.targetCalories || 2000);
   const calorieCurrent = Math.round(consumedToday?.calories || 0);
+  const calorieTarget = Math.round(stats?.targetCalories || 2000);
+  const burnedCalories = Math.round(consumedToday?.burnedCalories || 0);
 
-  const proteinTarget = Math.round(stats?.proteinTarget || 120);
   const proteinCurrent = Math.round(consumedToday?.protein || 0);
+  const proteinTarget = Math.round(stats?.proteinTarget || 120);
+
+  const carbsCurrent = Math.round(consumedToday?.carbs || 0);
+  const carbsTarget = Math.round(stats?.macros?.carbs || 200);
+
+  const fatCurrent = Math.round(consumedToday?.fat || 0);
+  const fatTarget = Math.round(stats?.macros?.fat || 70);
 
   const workoutsCompleted = dailyLog?.workouts?.length || 0;
+  const aiWorkoutsCompleted = dailyLog?.workouts?.filter(w => w.isAi)?.length || 0;
+
+  const todaySteps = useMemo(() => {
+    if (!stepHistory || stepHistory.length === 0) return 0;
+    const lastEntry = stepHistory[stepHistory.length - 1];
+    if (new Date(lastEntry.date).toDateString() === new Date().toDateString()) {
+      return lastEntry.steps || 0;
+    }
+    return 0;
+  }, [stepHistory]);
+
+  const hasLoggedBreakfast = dailyLog?.foods?.some(f => f.mealType === 'breakfast' || f.mealType === 'firstMeal');
+  const hasLoggedLunch = dailyLog?.foods?.some(f => f.mealType === 'lunch');
+  const hasLoggedDinner = dailyLog?.foods?.some(f => f.mealType === 'dinner' || f.mealType === 'lastMeal' || f.mealType === 'singleMeal');
+  const hasLoggedSnack = dailyLog?.foods?.some(f => f.mealType === 'snack' || f.mealType === 'liquidSnack');
 
   // Goals definition
   const goals = useMemo(() => {
-    return [
-      {
-        id: 'calorie_goal',
-        title: t('quests.calorieGoal'),
-        icon: 'food-apple',
-        xpReward: 50,
-        current: calorieCurrent,
-        target: calorieTarget,
-        unit: 'kcal',
-        isCompleted: calorieCurrent >= calorieTarget * 0.85 && calorieCurrent <= calorieTarget * 1.15,
-        description: t('quests.calorieGoalDesc', { current: calorieCurrent, target: calorieTarget }),
-        progress: Math.min(100, (calorieCurrent / calorieTarget) * 100),
-      },
-      {
-        id: 'water_goal',
-        title: t('quests.waterGoal'),
-        icon: 'water',
-        xpReward: 30,
-        current: waterCurrentL,
-        target: waterTargetL,
-        unit: 'L',
-        isCompleted: waterCurrentGlasses >= waterTargetGlasses,
-        description: t('quests.waterGoalDesc', { current: waterCurrentL.toFixed(1), target: waterTargetL.toFixed(1), target_glasses: waterTargetGlasses }),
-        progress: Math.min(100, (waterCurrentGlasses / waterTargetGlasses) * 100),
-      },
-      {
-        id: 'protein_goal',
-        title: t('quests.proteinGoal'),
-        icon: 'arm-flex',
-        xpReward: 40,
-        current: proteinCurrent,
-        target: proteinTarget,
-        unit: 'g',
-        isCompleted: proteinCurrent >= proteinTarget * 0.85,
-        description: t('quests.proteinGoalDesc', { current: proteinCurrent, target: proteinTarget }),
-        progress: Math.min(100, (proteinCurrent / proteinTarget) * 100),
-      },
-      {
-        id: 'workout_goal',
-        title: t('quests.workoutGoal'),
-        icon: 'dumbbell',
-        xpReward: 80,
-        current: workoutsCompleted,
-        target: 1,
-        unit: '',
-        isCompleted: workoutsCompleted >= 1 || (consumedToday?.burnedCalories || 0) > 0,
-        description: t('quests.workoutGoalDesc'),
-        progress: workoutsCompleted >= 1 || (consumedToday?.burnedCalories || 0) > 0 ? 100 : 0,
-      },
-    ];
-  }, [calorieCurrent, calorieTarget, waterCurrentL, waterTargetL, waterCurrentGlasses, waterTargetGlasses, proteinCurrent, proteinTarget, workoutsCompleted, consumedToday, t]);
+    return (dailyQuests || []).map(qId => {
+      let icon = 'star';
+      let xpReward = 50;
+      let current = 0;
+      let target = 1;
+      let unit = '';
+      let isCompleted = false;
+
+      switch(qId) {
+        // WATER
+        case 'water_1_5l': icon = 'water'; xpReward = 30; current = waterCurrentL; target = 1.5; unit = 'L'; isCompleted = waterCurrentL >= 1.5; break;
+        case 'water_2l': icon = 'water'; xpReward = 40; current = waterCurrentL; target = 2.0; unit = 'L'; isCompleted = waterCurrentL >= 2.0; break;
+        case 'water_2_5l': icon = 'water'; xpReward = 50; current = waterCurrentL; target = 2.5; unit = 'L'; isCompleted = waterCurrentL >= 2.5; break;
+        case 'water_3l': icon = 'water'; xpReward = 60; current = waterCurrentL; target = 3.0; unit = 'L'; isCompleted = waterCurrentL >= 3.0; break;
+
+        // PROTEIN
+        case 'protein_80g': icon = 'arm-flex'; xpReward = 40; current = proteinCurrent; target = 80; unit = 'g'; isCompleted = proteinCurrent >= 80; break;
+        case 'protein_100g': icon = 'arm-flex'; xpReward = 50; current = proteinCurrent; target = 100; unit = 'g'; isCompleted = proteinCurrent >= 100; break;
+        case 'protein_120g': icon = 'arm-flex'; xpReward = 60; current = proteinCurrent; target = 120; unit = 'g'; isCompleted = proteinCurrent >= 120; break;
+        case 'protein_150g': icon = 'arm-flex'; xpReward = 80; current = proteinCurrent; target = 150; unit = 'g'; isCompleted = proteinCurrent >= 150; break;
+        case 'protein_target': icon = 'arm-flex'; xpReward = 60; current = proteinCurrent; target = proteinTarget; unit = 'g'; isCompleted = proteinCurrent >= proteinTarget * 0.9; break;
+
+        // CALORIES
+        case 'cals_under_target': icon = 'food-apple'; xpReward = 50; current = calorieCurrent; target = calorieTarget; unit = 'kcal'; isCompleted = calorieCurrent > 0 && calorieCurrent <= calorieTarget * 1.1; break;
+        case 'cals_burn_200': icon = 'fire'; xpReward = 40; current = burnedCalories; target = 200; unit = 'kcal'; isCompleted = burnedCalories >= 200; break;
+        case 'cals_burn_400': icon = 'fire'; xpReward = 60; current = burnedCalories; target = 400; unit = 'kcal'; isCompleted = burnedCalories >= 400; break;
+        case 'cals_burn_600': icon = 'fire'; xpReward = 80; current = burnedCalories; target = 600; unit = 'kcal'; isCompleted = burnedCalories >= 600; break;
+
+        // MACROS
+        case 'carbs_target': icon = 'bread-slice'; xpReward = 40; current = carbsCurrent; target = carbsTarget; unit = 'g'; isCompleted = carbsCurrent > 0 && carbsCurrent <= carbsTarget * 1.1; break;
+        case 'fat_target': icon = 'oil'; xpReward = 40; current = fatCurrent; target = fatTarget; unit = 'g'; isCompleted = fatCurrent > 0 && fatCurrent <= fatTarget * 1.1; break;
+
+        // WORKOUTS
+        case 'workout_1': icon = 'dumbbell'; xpReward = 50; current = workoutsCompleted; target = 1; isCompleted = workoutsCompleted >= 1; break;
+        case 'workout_2': icon = 'weight-lifter'; xpReward = 100; current = workoutsCompleted; target = 2; isCompleted = workoutsCompleted >= 2; break;
+        case 'workout_ai': icon = 'robot'; xpReward = 80; current = aiWorkoutsCompleted; target = 1; isCompleted = aiWorkoutsCompleted >= 1; break;
+
+        // STEPS
+        case 'steps_3k': icon = 'shoe-print'; xpReward = 20; current = todaySteps; target = 3000; isCompleted = todaySteps >= 3000; break;
+        case 'steps_5k': icon = 'shoe-print'; xpReward = 30; current = todaySteps; target = 5000; isCompleted = todaySteps >= 5000; break;
+        case 'steps_8k': icon = 'shoe-print'; xpReward = 50; current = todaySteps; target = 8000; isCompleted = todaySteps >= 8000; break;
+        case 'steps_10k': icon = 'shoe-print'; xpReward = 70; current = todaySteps; target = 10000; isCompleted = todaySteps >= 10000; break;
+        case 'steps_12k': icon = 'shoe-print'; xpReward = 90; current = todaySteps; target = 12000; isCompleted = todaySteps >= 12000; break;
+        case 'steps_15k': icon = 'shoe-print'; xpReward = 120; current = todaySteps; target = 15000; isCompleted = todaySteps >= 15000; break;
+
+        // LOGGING
+        case 'log_breakfast': icon = 'coffee'; xpReward = 20; current = hasLoggedBreakfast ? 1 : 0; target = 1; isCompleted = hasLoggedBreakfast; break;
+        case 'log_lunch': icon = 'food-variant'; xpReward = 20; current = hasLoggedLunch ? 1 : 0; target = 1; isCompleted = hasLoggedLunch; break;
+        case 'log_dinner': icon = 'silverware-fork-knife'; xpReward = 20; current = hasLoggedDinner ? 1 : 0; target = 1; isCompleted = hasLoggedDinner; break;
+        case 'log_snack': icon = 'cookie'; xpReward = 10; current = hasLoggedSnack ? 1 : 0; target = 1; isCompleted = hasLoggedSnack; break;
+
+        // MISC
+        case 'fast_start': icon = 'shield-sun'; xpReward = 30; current = fastingState?.isActive ? 1 : 0; target = 1; isCompleted = fastingState?.isActive; break;
+        case 'streak_3': icon = 'fire'; xpReward = 50; current = streak; target = 3; isCompleted = streak >= 3; break;
+      }
+
+      return {
+        id: qId,
+        title: t(`quests.dynamic.${qId}.title`),
+        icon,
+        xpReward,
+        current,
+        target,
+        unit,
+        isCompleted,
+        description: t(`quests.dynamic.${qId}.desc`),
+        progress: Math.min(100, target > 0 ? (current / target) * 100 : 0),
+      };
+    });
+  }, [dailyQuests, calorieCurrent, calorieTarget, burnedCalories, waterCurrentL, waterCurrentGlasses, waterTargetGlasses, proteinCurrent, proteinTarget, carbsCurrent, carbsTarget, fatCurrent, fatTarget, workoutsCompleted, aiWorkoutsCompleted, todaySteps, hasLoggedBreakfast, hasLoggedLunch, hasLoggedDinner, hasLoggedSnack, fastingState, streak, t]);
 
   // Handle manual claim action
   const handleClaimReward = (goalId, xpReward, title) => {
@@ -233,11 +279,7 @@ export default function QuestScreen() {
                   <View style={styles.progressLabelRow}>
                     <Text style={styles.progressPercent}>{Math.round(goal.progress)}%</Text>
                     <Text style={styles.progressRatio}>
-                      {goal.id === 'water_goal'
-                        ? `${goal.current.toFixed(1)} / ${goal.target.toFixed(1)} ${goal.unit}`
-                        : goal.id === 'workout_goal'
-                        ? `${goal.current} / ${goal.target}`
-                        : `${goal.current} / ${goal.target} ${goal.unit}`}
+                      {typeof goal.current === 'number' && !Number.isInteger(goal.current) ? goal.current.toFixed(1) : goal.current} / {typeof goal.target === 'number' && !Number.isInteger(goal.target) ? goal.target.toFixed(1) : goal.target} {goal.unit}
                     </Text>
                   </View>
                 </View>

@@ -6,12 +6,11 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../hooks/useThemeColors';
 
 import DashboardScreen from '../screens/DashboardScreen';
-import MealsScreen from '../screens/MealsScreen';
 import QuestScreen from '../screens/QuestScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import WorkoutsScreen from '../screens/WorkoutsScreen';
 
-import { TYPOGRAPHY, SHADOWS, BORDER_RADIUS } from '../theme';
+import { SHADOWS, BORDER_RADIUS } from '../theme';
 
 const Tab = createBottomTabNavigator();
 
@@ -24,50 +23,55 @@ export default function MainTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarShowLabel: true,
-        tabBarActiveTintColor: COLORS.accent,
+        tabBarShowLabel: false, // Daha temiz bir görünüm için yazıları kaldırdık
+        tabBarActiveTintColor: COLORS.background, // Seçili ikonu belirgin yap
         tabBarInactiveTintColor: COLORS.textMuted,
         tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: styles.tabBarLabel,
+        tabBarItemStyle: styles.tabBarItem,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
 
           if (route.name === 'DashboardTab') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'MealsTab') {
-            iconName = focused ? 'restaurant' : 'restaurant-outline';
-          } else if (route.name === 'WorkoutsTab') {
-            iconName = focused ? 'barbell' : 'barbell-outline';
           } else if (route.name === 'QuestsTab') {
             iconName = focused ? 'shield-checkmark' : 'shield-checkmark-outline';
+          } else if (route.name === 'WorkoutsTab') {
+            iconName = focused ? 'barbell' : 'barbell-outline';
           } else if (route.name === 'ProfileTab') {
             iconName = focused ? 'person' : 'person-outline';
           }
 
-          return <Ionicons name={iconName} size={size + 2} color={color} />;
+          return (
+            <View style={[
+              styles.iconWrapper, 
+              focused && { backgroundColor: COLORS.primary }
+            ]}>
+              <Ionicons 
+                name={iconName} 
+                size={24} 
+                color={focused ? COLORS.background : COLORS.textMuted} 
+              />
+            </View>
+          );
         },
-        tabBarActiveBackgroundColor: 'transparent',
+        tabBarHideOnKeyboard: true,
       })}
     >
       <Tab.Screen 
         name="DashboardTab" 
         component={DashboardScreen} 
-        options={{ tabBarLabel: t('common.back') === 'Geri' ? 'Ana Sayfa' : 'Home' }} 
+      />
+      <Tab.Screen
+        name="QuestsTab"
+        component={QuestScreen}
       />
       <Tab.Screen 
         name="WorkoutsTab" 
         component={WorkoutsScreen} 
-        options={{ tabBarLabel: t('workouts.title') }} 
-      />
-      <Tab.Screen 
-        name="QuestsTab" 
-        component={QuestScreen} 
-        options={{ tabBarLabel: t('quests.title') }} 
       />
       <Tab.Screen 
         name="ProfileTab" 
         component={ProfileScreen} 
-        options={{ tabBarLabel: t('profile.title') }} 
       />
     </Tab.Navigator>
   );
@@ -76,22 +80,28 @@ export default function MainTabs() {
 const getStyles = (COLORS) => StyleSheet.create({
   tabBar: {
     backgroundColor: COLORS.card,
-    borderTopColor: COLORS.border,
     borderTopWidth: 1,
-    height: Platform.OS === 'ios' ? 90 : 70,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 10,
-    paddingTop: 10,
-    borderTopLeftRadius: BORDER_RADIUS.xl,
-    borderTopRightRadius: BORDER_RADIUS.xl,
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    ...SHADOWS.glow,
+    borderTopColor: COLORS.border,
+    height: Platform.OS === 'ios' ? 85 : 65,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 0,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
   },
-  tabBarLabel: {
-    fontFamily: TYPOGRAPHY.fontFamily.bold,
-    fontSize: 10,
-    marginTop: 4,
+  tabBarItem: {
+    padding: 0,
+    margin: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+  iconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: Platform.OS === 'ios' ? 10 : 0, // Ortalamayı düzeltmek için
+  }
 });

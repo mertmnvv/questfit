@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calculateAllStats } from '../utils/mathEngine';
 import { updateUserStats } from '../services/userService';
+import { getRandomQuests } from '../data/questPool';
 
 /**
  * Global User Store (GameManager mantığı)
@@ -25,6 +26,7 @@ export const useUserStore = create(
 
       // Günlük toplanan ödüller (Daily claimed rewards)
       claimedGoals: [],
+      dailyQuests: [],
 
       // Geçmiş
       recentSearches: [],
@@ -130,10 +132,10 @@ export const useUserStore = create(
         if (!lastActive) {
           // İlk kez giriyorsa veya Firebase'de kayıtlı tarih yoksa (1. gün bug'ı)
           // Verileri silmeden sadece tarihi bugüne eşitle ve streak 1 başlat
-          set({ lastActiveDate: today, streak: 1 });
+          set({ lastActiveDate: today, streak: 1, dailyQuests: getRandomQuests(4) });
           if (state.profile.id) {
             import('../services/userService').then(({ updateUserStats }) => {
-              updateUserStats(state.profile.id, { lastActiveDate: today, streak: 1 }).catch(console.log);
+              updateUserStats(state.profile.id, { lastActiveDate: today, streak: 1, dailyQuests: get().dailyQuests }).catch(console.log);
             });
           }
           return;
@@ -174,9 +176,10 @@ export const useUserStore = create(
           lastActiveDate: today,
           streak: newStreak,
           calorieHistory: newCalorieHistory,
-          consumedToday: { calories: 0, protein: 0, carbs: 0, fat: 0, water: 0, fiber: 0, burnedCalories: 0, aiWorkoutCompletedToday: false },
+          consumedToday: { calories: 0, protein: 0, carbs: 0, fat: 0, water: 0, fiber: 0, burnedCalories: 0, aiWorkoutCompletedToday: false, boxesEarnedToday: 0 },
           dailyLog: { foods: [], workouts: [] },
-          claimedGoals: []
+          claimedGoals: [],
+          dailyQuests: getRandomQuests(4)
         });
 
         // Firebase'e yeni streak ve geçmiş bilgisini yolla
@@ -187,7 +190,8 @@ export const useUserStore = create(
             claimedGoals: [],
             lastActiveDate: today,
             consumedToday: { calories: 0, protein: 0, carbs: 0, fat: 0, water: 0, fiber: 0, burnedCalories: 0, aiWorkoutCompletedToday: false },
-            dailyLog: { foods: [], workouts: [] }
+            dailyLog: { foods: [], workouts: [] },
+            dailyQuests: get().dailyQuests
           }).catch(err => console.log(err));
         }
       },
@@ -201,6 +205,18 @@ export const useUserStore = create(
 
         const calculatedStats = calculateAllStats(profileData);
         
+        const localState = get();
+        
+        // Firebase senkronizasyon gecikmelerine karşı yerel veriyi koruma (Persistence Fix)
+        // Eğer yerel hafızadaki kalori veya yenen yemek sayısı Firebase'den fazlaysa yerel olanı kullan.
+        const mergedConsumedToday = (localState.consumedToday?.calories > (profileData.consumedToday?.calories || 0)) 
+          ? localState.consumedToday 
+          : (profileData.consumedToday || { calories: 0, protein: 0, carbs: 0, fat: 0, water: 0, fiber: 0, burnedCalories: 0, aiWorkoutCompletedToday: false });
+          
+        const mergedDailyLog = (localState.dailyLog?.foods?.length > (profileData.dailyLog?.foods?.length || 0))
+          ? localState.dailyLog
+          : (profileData.dailyLog || { foods: [], workouts: [] });
+
         set({
           profile: {
             ...profileData,
@@ -218,9 +234,10 @@ export const useUserStore = create(
           recentSearches: profileData.recentSearches || [],
           recentFoods: profileData.recentFoods || [],
           claimedGoals: profileData.claimedGoals || [],
+          dailyQuests: profileData.dailyQuests && profileData.dailyQuests.length > 0 ? profileData.dailyQuests : getRandomQuests(4),
           lastActiveDate: profileData.lastActiveDate || null,
-          consumedToday: profileData.consumedToday || { calories: 0, protein: 0, carbs: 0, fat: 0, water: 0, fiber: 0, burnedCalories: 0, aiWorkoutCompletedToday: false },
-          dailyLog: profileData.dailyLog || { foods: [], workouts: [] },
+          consumedToday: mergedConsumedToday,
+          dailyLog: mergedDailyLog,
           fastingState: profileData.fastingState || { isActive: false, startTime: null, durationHours: 16 },
           ...(profileData.appTheme ? { appTheme: profileData.appTheme } : {}),
           ...(profileData.appLanguage ? { appLanguage: profileData.appLanguage } : {})
@@ -343,7 +360,7 @@ export const useUserStore = create(
 
         const newWorkoutHistory = [
           ...(state.workoutHistory || []),
-          { id: Date.now().toString(), date: new Date().toISOString(), name: title, exercises }
+          { id: Date.now().toString(), date: new Date().toISOString(), name: title, calories: burned, exercises }
         ].slice(-50); // Keep last 50 workouts
 
         set({ consumedToday: newConsumed, dailyLog: newDailyLog, workoutHistory: newWorkoutHistory });
@@ -569,7 +586,10 @@ export const useUserStore = create(
           consumedToday: { calories: 0, protein: 0, carbs: 0, fat: 0, water: 0, fiber: 0, burnedCalories: 0 },
           dailyLog: { foods: [], workouts: [] },
           claimedGoals: [],
-          fastingState: { isActive: false, startTime: null, durationHours: 16 }
+          fastingState: { isActive: false, startTime: null, durationHours: 16 },
+          inventory: [],
+          equippedItems: { head: null, chest: null, weapon: null, pet: null },
+          boxes: { wood: 0, silver: 0, gold: 0 },
         });
       },
     }),

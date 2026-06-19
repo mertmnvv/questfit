@@ -13,7 +13,7 @@ export const searchFood = async (query) => {
 
   try {
     // 1. ADIM: FIRESTORE CACHE KONTROLÜ
-    const foodDocRef = doc(db, 'foods', normalizedQuery);
+    const foodDocRef = doc(db, 'foods', 'v2_' + normalizedQuery);
     const foodDocSnap = await getDoc(foodDocRef);
 
     if (foodDocSnap.exists()) {
@@ -41,14 +41,18 @@ export const searchFood = async (query) => {
             role: 'system',
             content: `Sen uzman bir diyetisyen ve veri bilimcisin. Kullanıcı sana genel bir yemek adı (örn: "kuru fasulye" veya "tavuk") veya spesifik bir isim verecek.
 Görevlerin:
-1. Eğer genel bir kelime girildiyse, o yemeğin en popüler 3 ila 5 farklı çeşidini (Örn: Etli, Etsiz, Zeytinyağlı, Haşlama vb.) üret.
-2. Eğer zaten çok spesifik bir yemek girdiyse (Örn: "Zeytinyağlı Kuru Fasulye"), sadece o yemeği ve 1-2 çok yakın benzerini üret.
-4. Ayrıca her yemek için ortalama 1 adetinin (pieceWeight) kaç gram olduğunu ve ortalama 1 porsiyonunun (portionWeight) kaç gram olduğunu ekle. Eğer sıvı veya adetle sayılmayan bir besinse (örn: zeytinyağı, pilav, yulaf) pieceWeight değerini KESİNLİKLE 0 yap.
-5. SADECE GEÇERLİ BİR JSON DİZİSİ (ARRAY) DÖNDÜR! Markdown, açıklama veya ek metin KESİNLİKLE KULLANMA.
+1. Eğer genel bir kelime girildiyse, o yemeğin en popüler 3 ila 5 farklı çeşidini üret. Spesifikse, sadece onu ve 1-2 benzerini üret.
+2. DİKKAT: Makro değerlerini (calories, protein, carbs, fat) KESİNLİKLE 100 gram üzerinden DEĞİL, aşağıda belirleyeceğin 1 BİRİM (1 Adet veya 1 Porsiyon) üzerinden hesapla ve yaz.
+3. BİRİM KURALLARI:
+   - Eğer ürün tekli tüketilebiliyorsa (Kutu İçecek, Yumurta, Meyve, Gofret, Enerji İçeceği, Burger), bunu ADET (pieceWeight > 0) olarak kabul et. Kalori ve makroları TAM OLARAK 1 ADET (örn: 1 kutu 330ml/500ml) için yaz. Bu durumda portionWeight'i 0 yapabilirsin veya adet gramajıyla aynı yapabilirsin.
+   - Eğer ürün sıvı (bardakla/şişeyle içilenler hariç zeytinyağı vb.) veya taneli (pilav, yulaf, çorba) ise, ADET OLAMAZ. Bu durumda pieceWeight değerini KESİNLİKLE 0 yap. Kalori ve makroları TAM OLARAK 1 PORSİYON (portionWeight, örn: 200g) için yaz.
+4. ÖZEL UYARI: "Monster White, Diet Coke, Zero Kola, Şekersiz İçecek, Sade Kahve" gibi kalorisiz/şekersiz ürünler girildiğinde, 1 Kutu veya 1 Bardak kalorisini KESİNLİKLE 3 ile 15 kcal arasında tut. Enerji içeceği (Monster vb.) 1 Kutu (500ml) adet kabul edilmelidir.
+5. SADECE GEÇERLİ BİR JSON DİZİSİ (ARRAY) DÖNDÜR! Markdown veya ek metin KESİNLİKLE KULLANMA.
 Format şu şekilde bir DİZİ olmalı:
 [
-  {"name": "Etli Kuru Fasulye", "calories": 130, "protein": 8, "carbs": 15, "fat": 5, "pieceWeight": 0, "portionWeight": 250},
-  {"name": "Haşlanmış Yumurta", "calories": 155, "protein": 13, "carbs": 1.1, "fat": 11, "pieceWeight": 50, "portionWeight": 100}
+  {"name": "Monster Ultra White (1 Kutu)", "calories": 10, "protein": 0, "carbs": 4, "fat": 0, "pieceWeight": 500, "portionWeight": 0},
+  {"name": "Etli Kuru Fasulye (1 Porsiyon)", "calories": 320, "protein": 18, "carbs": 35, "fat": 12, "pieceWeight": 0, "portionWeight": 250},
+  {"name": "Haşlanmış Yumurta", "calories": 78, "protein": 6, "carbs": 0.5, "fat": 5, "pieceWeight": 50, "portionWeight": 0}
 ]`
           },
           {
@@ -83,10 +87,10 @@ Format şu şekilde bir DİZİ olmalı:
       id: `${normalizedQuery}_${index}`,
       name: parsedItem.name || query,
       type: 'Yapay Zeka & Topluluk',
-      description: `100g: ${parsedItem.calories} kcal | P: ${parsedItem.protein}g | K: ${parsedItem.carbs}g | Y: ${parsedItem.fat}g`,
-      baseAmount: 100,
-      pieceWeight: parseFloat(parsedItem.pieceWeight) || 100,
-      portionWeight: parseFloat(parsedItem.portionWeight) || 200,
+      description: `1 Birim: ${parsedItem.calories} kcal | P: ${parsedItem.protein}g | K: ${parsedItem.carbs}g | Y: ${parsedItem.fat}g`,
+      baseAmount: 1,
+      pieceWeight: parsedItem.pieceWeight !== undefined && parsedItem.pieceWeight !== null ? Number(parsedItem.pieceWeight) : 0,
+      portionWeight: parsedItem.portionWeight !== undefined && parsedItem.portionWeight !== null ? Number(parsedItem.portionWeight) : 200,
       macros: {
         calories: parseFloat(parsedItem.calories) || 0,
         protein: parseFloat(parsedItem.protein) || 0,
@@ -97,17 +101,147 @@ Format şu şekilde bir DİZİ olmalı:
 
     // 3. ADIM: SONUCU FIRESTORE'A KAYDET (Öğrenen Veritabanı)
     // Firestore'da listeyi bir array field olarak saklıyoruz.
-    await setDoc(foodDocRef, {
-      query: normalizedQuery,
-      results: formattedItems,
-      createdAt: serverTimestamp()
-    });
-    console.log('Yeni varyasyonlar Firestore veritabanına eklendi!');
+    try {
+      await setDoc(foodDocRef, {
+        query: normalizedQuery,
+        results: formattedItems,
+        createdAt: serverTimestamp()
+      });
+      console.log('Yeni varyasyonlar Firestore veritabanına eklendi!');
+    } catch (err) {
+      console.error('Veritabanına eklenirken hata oluştu:', err);
+    }
 
     return formattedItems;
 
   } catch (error) {
     console.error('Besin Arama/Cache Hatası:', error);
+    return [];
+  }
+};
+
+/**
+ * OpenFoodFacts API üzerinden barkod sorgusu yapar.
+ */
+export const searchFoodByBarcode = async (barcode) => {
+  try {
+    const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+    const data = await response.json();
+    
+    if (data.status === 1 && data.product) {
+      const p = data.product;
+      const nutriments = p.nutriments || {};
+      
+      const calories = nutriments['energy-kcal_100g'] || nutriments['energy-kcal'] || 0;
+      const protein = nutriments.proteins_100g || nutriments.proteins || 0;
+      const carbs = nutriments.carbohydrates_100g || nutriments.carbohydrates || 0;
+      const fat = nutriments.fat_100g || nutriments.fat || 0;
+      
+      // We assume default portion is 100g unless package says otherwise, but we'll return per 100g base for simplicity
+      // Or we can return it as an array to match the searchFood format
+      const formattedItem = {
+        id: `barcode_${barcode}`,
+        name: p.product_name || 'Bilinmeyen Ürün',
+        type: p.brands || 'Paketli Gıda',
+        description: `100g: ${Math.round(calories)} kcal | P: ${Math.round(protein)}g | K: ${Math.round(carbs)}g | Y: ${Math.round(fat)}g`,
+        baseAmount: 1,
+        pieceWeight: 0,
+        portionWeight: 100, // 1 Porsiyon = 100g as default for barcodes
+        macros: {
+          calories: parseFloat(calories) || 0,
+          protein: parseFloat(protein) || 0,
+          carbs: parseFloat(carbs) || 0,
+          fat: parseFloat(fat) || 0,
+        }
+      };
+      return [formattedItem];
+    }
+    return [];
+  } catch (error) {
+    console.error('Barcode error:', error);
+    return [];
+  }
+};
+
+/**
+ * Gönderilen base64 resmi Groq Vision modeline iletip analiz eder.
+ */
+export const analyzeFoodFromImage = async (base64Image) => {
+  try {
+    console.log('Resim Groq AI Vision modeline gönderiliyor...');
+    
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.2-11b-vision-preview',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Sen uzman bir diyetisyensin. Gönderilen fotoğraftaki yemeği veya yiyecekleri analiz et. 
+Eğer bu bir tabak ise, tabağın içindeki tüm yiyecekleri tek bir öğün olarak topla.
+DİKKAT: Makro değerlerini (calories, protein, carbs, fat) tabaktaki tahmini porsiyon miktarına (örn: 1 tabak veya 1 porsiyon) göre hesapla.
+SADECE GEÇERLİ BİR JSON DİZİSİ (ARRAY) DÖNDÜR! Markdown KULLANMA.
+Format şu olmalı:
+[
+  {"name": "Gördüğün Yemeğin Adı", "calories": 450, "protein": 30, "carbs": 40, "fat": 15, "pieceWeight": 0, "portionWeight": 350}
+]`
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:image/jpeg;base64,${base64Image}`
+                }
+              }
+            ]
+          }
+        ],
+        temperature: 0.2
+      })
+    });
+
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+
+    const textResponse = data.choices[0].message.content;
+    const cleanJsonString = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    let parsedArray = [];
+    try {
+      parsedArray = JSON.parse(cleanJsonString);
+      if (!Array.isArray(parsedArray)) {
+        parsedArray = [parsedArray];
+      }
+    } catch (e) {
+      console.error("Vision JSON Parse Hatası:", e, textResponse);
+      throw new Error("Görüntü analiz edilemedi.");
+    }
+
+    const formattedItems = parsedArray.map((parsedItem, index) => ({
+      id: `vision_${Date.now()}_${index}`,
+      name: parsedItem.name || 'Görselden Tanınan Yemek',
+      type: 'Yapay Zeka (Görsel)',
+      description: `Tabak Porsiyonu: ${parsedItem.calories} kcal | P: ${parsedItem.protein}g | K: ${parsedItem.carbs}g | Y: ${parsedItem.fat}g`,
+      baseAmount: 1,
+      pieceWeight: parsedItem.pieceWeight ? Number(parsedItem.pieceWeight) : 0,
+      portionWeight: parsedItem.portionWeight ? Number(parsedItem.portionWeight) : 250,
+      macros: {
+        calories: parseFloat(parsedItem.calories) || 0,
+        protein: parseFloat(parsedItem.protein) || 0,
+        carbs: parseFloat(parsedItem.carbs) || 0,
+        fat: parseFloat(parsedItem.fat) || 0,
+      }
+    }));
+
+    return formattedItems;
+  } catch (error) {
+    console.error('Resim Analiz Hatası:', error);
     throw new Error('Yapay zeka bu yemeği analiz edemedi veya bağlantı koptu.');
   }
 };

@@ -412,7 +412,7 @@ export default function DashboardScreen() {
             </View>
           )}
 
-          {/* --- RPG INVENTORY (Replaces Diary Section) --- */}
+          {/* --- RPG INVENTORY (Meals Section) --- */}
           <View style={styles.rpgInventorySection}>
             <View style={styles.rpgInventoryHeaderRow}>
               <Text style={styles.rpgInventoryTitle}>{t('dashboard.rations')}</Text>
