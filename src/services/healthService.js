@@ -1,82 +1,34 @@
-import { Platform } from 'react-native';
-import AppleHealthKit from 'react-native-health';
-import GoogleFit, { Scopes } from 'react-native-google-fit';
+import { Pedometer } from 'expo-sensors';
 import { useUserStore } from '../store/userStore';
 
-const permissions = {
-  permissions: {
-    read: [AppleHealthKit.Constants.Permissions.Steps, AppleHealthKit.Constants.Permissions.ActiveEnergyBurned],
-    write: [],
-  },
-};
-
 export const initHealthIntegration = async () => {
-  if (Platform.OS === 'ios') {
-    AppleHealthKit.initHealthKit(permissions, (error) => {
-      if (error) {
-        console.log('[Health] Cannot grant permissions!');
-      }
-    });
-  } else if (Platform.OS === 'android') {
-    const options = {
-      scopes: [
-        Scopes.FITNESS_ACTIVITY_READ,
-        Scopes.FITNESS_BODY_READ,
-      ],
-    };
-    GoogleFit.authorize(options)
-      .then(authResult => {
-        if (authResult.success) {
-          console.log('[Health] Google Fit authorized');
-        } else {
-          console.log('[Health] Google Fit denied');
-        }
-      })
-      .catch((e) => {
-        console.log('[Health] Google Fit Error:', e);
-      });
+  const { status } = await Pedometer.requestPermissionsAsync();
+  if (status !== 'granted') {
+    console.log('[Health] Pedometer permission denied!');
+    return false;
   }
+  return true;
 };
 
 export const fetchDailyStepsAndCalories = async () => {
-  return new Promise((resolve) => {
-    const result = { steps: 0, calories: 0 };
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  try {
+    const isAvailable = await Pedometer.isAvailableAsync();
+    if (!isAvailable) return { steps: 0, calories: 0 };
 
-    if (Platform.OS === 'ios') {
-      const options = { date: today.toISOString() };
-      AppleHealthKit.getStepCount(options, (err, stepsData) => {
-        if (!err && stepsData) result.steps = stepsData.value;
-        AppleHealthKit.getActiveEnergyBurned(options, (err, calData) => {
-          if (!err && calData && calData.length > 0) {
-            result.calories = calData.reduce((acc, curr) => acc + curr.value, 0);
-          }
-          resolve(result);
-        });
-      });
-    } else {
-      const opt = {
-        startDate: today.toISOString(),
-        endDate: new Date().toISOString(),
-      };
-      GoogleFit.getDailyStepCountSamples(opt)
-        .then((res) => {
-          const source = res.find(r => r.source === 'com.google.android.gms:estimated_steps');
-          if (source && source.steps.length > 0) {
-            result.steps = source.steps[0].value;
-          }
-          GoogleFit.getDailyCalorieSamples(opt)
-            .then((calRes) => {
-              if (calRes && calRes.length > 0 && calRes[0].calorie > 0) {
-                // Adjust base calories if needed
-                result.calories = calRes[0].calorie; 
-              }
-              resolve(result);
-            }).catch(() => resolve(result));
-        }).catch(() => resolve(result));
-    }
-  });
+    const end = new Date();
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+
+    const stepResult = await Pedometer.getStepCountAsync(start, end);
+    const steps = stepResult.steps;
+    // Basit bir kalori tahmini (1000 adım ~ 40-50 kalori)
+    const calories = steps * 0.045;
+
+    return { steps, calories };
+  } catch (error) {
+    console.log('Pedometer error:', error);
+    return { steps: 0, calories: 0 };
+  }
 };
 
 export const syncHealthDataToStore = async () => {
@@ -94,7 +46,6 @@ export const syncHealthDataToStore = async () => {
       });
     }
 
-    // Also update step history
     const history = await fetchStepHistory(7);
     if (history && history.length > 0) {
       updateStepHistory(history);
@@ -103,46 +54,30 @@ export const syncHealthDataToStore = async () => {
 };
 
 export const fetchStepHistory = async (days = 7) => {
-  return new Promise((resolve) => {
-    let history = [];
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - days + 1); // +1 to include today as the last day
-    startDate.setHours(0, 0, 0, 0);
+  try {
+    const isAvailable = await Pedometer.isAvailableAsync();
+    if (!isAvailable) return [];
 
-    if (Platform.OS === 'ios') {
-      const options = {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-      };
-      AppleHealthKit.getDailyStepCountSamples(options, (err, results) => {
-        if (!err && results) {
-          // results: [{value, startDate, endDate}]
-          history = results.map(r => ({
-            date: r.startDate,
-            steps: r.value
-          })).sort((a, b) => new Date(a.date) - new Date(b.date));
-        }
-        resolve(history);
+    let history = [];
+    for (let i = 0; i < days; i++) {
+      const end = new Date();
+      end.setDate(end.getDate() - i);
+      end.setHours(23, 59, 59, 999);
+
+      const start = new Date();
+      start.setDate(start.getDate() - i);
+      start.setHours(0, 0, 0, 0);
+
+      const stepResult = await Pedometer.getStepCountAsync(start, end);
+      history.push({
+        date: start.toISOString().split('T')[0],
+        steps: stepResult.steps,
       });
-    } else {
-      const opt = {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        bucketUnit: 'DAY',
-        bucketInterval: 1,
-      };
-      GoogleFit.getDailyStepCountSamples(opt)
-        .then((res) => {
-          const source = res.find(r => r.source === 'com.google.android.gms:estimated_steps');
-          if (source && source.steps) {
-            history = source.steps.map(s => ({
-              date: s.date || s.startDate,
-              steps: s.value
-            })).sort((a, b) => new Date(a.date) - new Date(b.date));
-          }
-          resolve(history);
-        }).catch(() => resolve(history));
     }
-  });
+
+    return history.reverse(); // Eskiden yeniye sıralı
+  } catch (error) {
+    console.log('Pedometer history error:', error);
+    return [];
+  }
 };

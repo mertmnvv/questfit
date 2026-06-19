@@ -23,7 +23,8 @@
       },
       "package": "com.anonymous.QuestFit",
       "permissions": [
-        "INTERNET"
+        "INTERNET",
+        "ACTIVITY_RECOGNITION"
       ],
       "usesCleartextTraffic": true
     },
@@ -41,6 +42,11 @@
           "color": "#40C057"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c3642480-c672-460f-81f7-31e3f292eabe"
+      }
+    }
   }
 }
