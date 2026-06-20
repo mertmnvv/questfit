@@ -209,7 +209,7 @@ export default function WorkoutsScreen() {
       Toast.show({
         type: 'error',
         text1: t('common.error'),
-        text2: 'Routine has no exercises!',
+        text2: t('toasts.routineNoExercises'),
         position: 'top',
         topOffset: 60,
       });
@@ -241,7 +241,7 @@ export default function WorkoutsScreen() {
       Toast.show({
         type: 'error',
         text1: t('common.error'),
-        text2: 'Lütfen geçerli bir süre girin.',
+        text2: t('toasts.invalidDuration'),
         position: 'top',
         topOffset: 60,
       });
@@ -266,7 +266,7 @@ export default function WorkoutsScreen() {
       Toast.show({
         type: 'success',
         text1: t('common.success'),
-        text2: `${quickLogName.trim()} kaydedildi! AI Tahmini: ~${calculatedCalories} kcal.`,
+        text2: t('toasts.logSavedCalorie', { name: quickLogName.trim(), cals: calculatedCalories }),
         position: 'top',
         topOffset: 60,
       });
@@ -277,7 +277,7 @@ export default function WorkoutsScreen() {
       Toast.show({
         type: 'error',
         text1: t('common.error'),
-        text2: 'Yapay Zeka kalori hesaplarken bir hata oluştu.',
+        text2: t('toasts.aiCalorieError'),
         position: 'top',
         topOffset: 60,
       });

@@ -193,8 +193,8 @@ export default function ActiveWorkoutScreen() {
 
     Toast.show({
       type: 'success',
-      text1: 'Antrenman Tamamlandı!',
-      text2: `${totalCals} kcal yakıldı ve XP kazanıldı!`,
+      text1: t('toasts.workoutCompleted'),
+      text2: t('toasts.workoutCompletedDesc', { cals: totalCals }),
       position: 'top',
       topOffset: 60,
     });

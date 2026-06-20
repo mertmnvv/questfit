@@ -76,11 +76,8 @@ export const useUserStore = create(
       setFastingState: (newState) => {
         set((state) => {
           const updatedFasting = { ...state.fastingState, ...newState };
-          // Firebase'e kaydet (eğer profil varsa)
           if (state.profile?.id) {
-            import('../services/userService').then(({ updateUserStats }) => {
-              updateUserStats(state.profile.id, { fastingState: updatedFasting }).catch(console.error);
-            });
+            updateUserStats(state.profile.id, { fastingState: updatedFasting }).catch(console.error);
           }
           return { fastingState: updatedFasting };
         });
@@ -89,18 +86,14 @@ export const useUserStore = create(
       setAppTheme: (theme) => {
         set({ appTheme: theme });
         if (get().profile?.id) {
-          import('../services/userService').then(({ updateUserStats }) => {
-            updateUserStats(get().profile.id, { appTheme: theme }).catch(console.error);
-          });
+          updateUserStats(get().profile.id, { appTheme: theme }).catch(console.error);
         }
       },
 
       setAppLanguage: (lang) => {
         set({ appLanguage: lang });
         if (get().profile?.id) {
-          import('../services/userService').then(({ updateUserStats }) => {
-            updateUserStats(get().profile.id, { appLanguage: lang }).catch(console.error);
-          });
+          updateUserStats(get().profile.id, { appLanguage: lang }).catch(console.error);
         }
       },
 
@@ -117,26 +110,19 @@ export const useUserStore = create(
         const lastActive = state.lastActiveDate;
 
         if (lastActive === today) {
-          // Eski bug yüzünden bugün girmiş olmasına rağmen serisi 0 kalanları 1'e sabitle
           if ((state.streak || 0) === 0) {
             set({ streak: 1 });
             if (state.profile?.id) {
-              import('../services/userService').then(({ updateUserStats }) => {
-                updateUserStats(state.profile.id, { streak: 1 }).catch(console.log);
-              });
+              updateUserStats(state.profile.id, { streak: 1 }).catch(console.log);
             }
           }
-          return; // Bugün zaten girilmiş
+          return;
         }
 
         if (!lastActive) {
-          // İlk kez giriyorsa veya Firebase'de kayıtlı tarih yoksa (1. gün bug'ı)
-          // Verileri silmeden sadece tarihi bugüne eşitle ve streak 1 başlat
           set({ lastActiveDate: today, streak: 1, dailyQuests: getRandomQuests(4) });
           if (state.profile.id) {
-            import('../services/userService').then(({ updateUserStats }) => {
-              updateUserStats(state.profile.id, { lastActiveDate: today, streak: 1, dailyQuests: get().dailyQuests }).catch(console.log);
-            });
+            updateUserStats(state.profile.id, { lastActiveDate: today, streak: 1, dailyQuests: get().dailyQuests }).catch(console.log);
           }
           return;
         }
@@ -238,9 +224,7 @@ export const useUserStore = create(
           lastActiveDate: profileData.lastActiveDate || null,
           consumedToday: mergedConsumedToday,
           dailyLog: mergedDailyLog,
-          fastingState: profileData.fastingState || { isActive: false, startTime: null, durationHours: 16 },
-          ...(profileData.appTheme ? { appTheme: profileData.appTheme } : {}),
-          ...(profileData.appLanguage ? { appLanguage: profileData.appLanguage } : {})
+          fastingState: profileData.fastingState || { isActive: false, startTime: null, durationHours: 16 }
         });
         
         // Profil yüklenince otomatik günlük reset kontrolü yap
@@ -459,19 +443,19 @@ export const useUserStore = create(
       },
 
       // Besin Ekleme İşlemi
-      addFood: (food, grams, mealType = 'unknown') => {
+      addFood: (foodEntry) => {
         const state = get();
         const consumedToday = state.consumedToday || {
           calories: 0, protein: 0, carbs: 0, fat: 0, water: 0, fiber: 0, burnedCalories: 0
         };
         const dailyLog = state.dailyLog || { foods: [], workouts: [] };
 
-        const ratio = grams / (food.baseAmount || 100);
-
-        const calories = (food.macros?.calories || 0) * ratio;
-        const protein = (food.macros?.protein || 0) * ratio;
-        const carbs = (food.macros?.carbs || 0) * ratio;
-        const fat = (food.macros?.fat || 0) * ratio;
+        const calories = foodEntry.calories || 0;
+        const protein = foodEntry.protein || 0;
+        const carbs = foodEntry.carbs || 0;
+        const fat = foodEntry.fat || 0;
+        const name = foodEntry.name || 'Bilinmeyen Yemek';
+        const mealType = foodEntry.mealType || 'unknown';
 
         const newConsumed = {
           ...consumedToday,
@@ -485,16 +469,17 @@ export const useUserStore = create(
           ...dailyLog,
           foods: [
             ...dailyLog.foods,
-            { id: Date.now().toString(), name: food.name, calories, protein, carbs, fat, mealType }
+            { id: Date.now().toString(), name, calories, protein, carbs, fat, mealType }
           ]
         };
 
         // recentFoods'a ekle (son 15 ürünü tutalım)
         let updatedRecentFoods = state.recentFoods ? [...state.recentFoods] : [];
-        // Eğer zaten varsa listeden çıkarıp en başa ekleyelim
-        updatedRecentFoods = updatedRecentFoods.filter(f => f.name !== food.name);
-        updatedRecentFoods.unshift(food);
-        if (updatedRecentFoods.length > 15) updatedRecentFoods.pop();
+        if (foodEntry.originalFood) {
+          updatedRecentFoods = updatedRecentFoods.filter(f => f.name !== foodEntry.originalFood.name);
+          updatedRecentFoods.unshift(foodEntry.originalFood);
+          if (updatedRecentFoods.length > 15) updatedRecentFoods.pop();
+        }
 
         set({ consumedToday: newConsumed, dailyLog: newDailyLog, recentFoods: updatedRecentFoods });
         

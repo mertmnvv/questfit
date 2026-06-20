@@ -1,15 +1,17 @@
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 
 /**
  * Yemek sorgusu yapar. Önce Firestore (kendi veritabanımız) kontrol edilir.
  * Eğer yoksa Groq API'ye (Llama 3) sorulur ve sonuç veritabanına kaydedilir.
  */
-export const searchFood = async (query) => {
+export const searchFood = async (query, language = 'tr') => {
   if (!query) return [];
-  const normalizedQuery = query.toLowerCase().trim();
+  const normalizedQuery = `${query.toLowerCase().trim()}_${language}`;
 
   try {
     // 1. ADIM: FIRESTORE CACHE KONTROLÜ
@@ -48,6 +50,7 @@ Görevlerin:
    - Eğer ürün sıvı (bardakla/şişeyle içilenler hariç zeytinyağı vb.) veya taneli (pilav, yulaf, çorba) ise, ADET OLAMAZ. Bu durumda pieceWeight değerini KESİNLİKLE 0 yap. Kalori ve makroları TAM OLARAK 1 PORSİYON (portionWeight, örn: 200g) için yaz.
 4. ÖZEL UYARI: "Monster White, Diet Coke, Zero Kola, Şekersiz İçecek, Sade Kahve" gibi kalorisiz/şekersiz ürünler girildiğinde, 1 Kutu veya 1 Bardak kalorisini KESİNLİKLE 3 ile 15 kcal arasında tut. Enerji içeceği (Monster vb.) 1 Kutu (500ml) adet kabul edilmelidir.
 5. SADECE GEÇERLİ BİR JSON DİZİSİ (ARRAY) DÖNDÜR! Markdown veya ek metin KESİNLİKLE KULLANMA.
+6. ÖNEMLİ: Yemek isimlerini (name) kesinlikle ve her zaman ${language === 'en' ? 'İngilizce (English)' : 'Türkçe'} dilinde döndür. Ancak JSON formatı değişmesin.
 Format şu şekilde bir DİZİ olmalı:
 [
   {"name": "Monster Ultra White (1 Kutu)", "calories": 10, "protein": 0, "carbs": 4, "fat": 0, "pieceWeight": 500, "portionWeight": 0},
@@ -86,8 +89,10 @@ Format şu şekilde bir DİZİ olmalı:
     const formattedItems = parsedArray.map((parsedItem, index) => ({
       id: `${normalizedQuery}_${index}`,
       name: parsedItem.name || query,
-      type: 'Yapay Zeka & Topluluk',
-      description: `1 Birim: ${parsedItem.calories} kcal | P: ${parsedItem.protein}g | K: ${parsedItem.carbs}g | Y: ${parsedItem.fat}g`,
+      type: language === 'en' ? 'AI & Community' : 'Yapay Zeka & Topluluk',
+      description: language === 'en' 
+        ? `1 Unit: ${parsedItem.calories} kcal | P: ${parsedItem.protein}g | C: ${parsedItem.carbs}g | F: ${parsedItem.fat}g` 
+        : `1 Birim: ${parsedItem.calories} kcal | P: ${parsedItem.protein}g | K: ${parsedItem.carbs}g | Y: ${parsedItem.fat}g`,
       baseAmount: 1,
       pieceWeight: parsedItem.pieceWeight !== undefined && parsedItem.pieceWeight !== null ? Number(parsedItem.pieceWeight) : 0,
       portionWeight: parsedItem.portionWeight !== undefined && parsedItem.portionWeight !== null ? Number(parsedItem.portionWeight) : 200,
@@ -139,6 +144,7 @@ export const searchFoodByBarcode = async (barcode) => {
       
       // We assume default portion is 100g unless package says otherwise, but we'll return per 100g base for simplicity
       // Or we can return it as an array to match the searchFood format
+      const isEn = barcode.includes('en'); // A simple placeholder if we needed lang, but we don't have it here easily
       const formattedItem = {
         id: `barcode_${barcode}`,
         name: p.product_name || 'Bilinmeyen Ürün',
@@ -166,50 +172,51 @@ export const searchFoodByBarcode = async (barcode) => {
 /**
  * Gönderilen base64 resmi Groq Vision modeline iletip analiz eder.
  */
-export const analyzeFoodFromImage = async (base64Image) => {
+export const analyzeFoodFromImage = async (base64Image, language = 'tr') => {
   try {
-    console.log('Resim Groq AI Vision modeline gönderiliyor...');
+    console.log('Resim Gemini AI Vision modeline gönderiliyor...');
     
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.2-11b-vision-preview',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `Sen uzman bir diyetisyensin. Gönderilen fotoğraftaki yemeği veya yiyecekleri analiz et. 
+    if (!GEMINI_API_KEY) throw new Error('Gemini API anahtarı eksik.');
+    
+    const prompt = `Sen uzman bir diyetisyensin. Gönderilen fotoğraftaki yemeği veya yiyecekleri analiz et. 
 Eğer bu bir tabak ise, tabağın içindeki tüm yiyecekleri tek bir öğün olarak topla.
 DİKKAT: Makro değerlerini (calories, protein, carbs, fat) tabaktaki tahmini porsiyon miktarına (örn: 1 tabak veya 1 porsiyon) göre hesapla.
+ÖNEMLİ: Yemek isimlerini (name) kesinlikle ve her zaman ${language === 'en' ? 'İngilizce (English)' : 'Türkçe'} dilinde döndür.
 SADECE GEÇERLİ BİR JSON DİZİSİ (ARRAY) DÖNDÜR! Markdown KULLANMA.
 Format şu olmalı:
 [
-  {"name": "Gördüğün Yemeğin Adı", "calories": 450, "protein": 30, "carbs": 40, "fat": 15, "pieceWeight": 0, "portionWeight": 350}
-]`
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:image/jpeg;base64,${base64Image}`
-                }
-              }
-            ]
-          }
-        ],
-        temperature: 0.2
+  {"name": "${language === 'en' ? 'Food Name You See' : 'Gördüğün Yemeğin Adı'}", "calories": 450, "protein": 30, "carbs": 40, "fat": 15, "pieceWeight": 0, "portionWeight": 350}
+]`;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: 'image/jpeg', data: base64Image } }
+          ]
+        }],
+        generationConfig: {
+          responseMimeType: 'application/json'
+        }
       })
     });
 
     const data = await response.json();
-    if (data.error) throw new Error(data.error.message);
+    if (data.error) {
+      console.error('Gemini API Hatası:', data.error);
+      throw new Error(data.error.message);
+    }
 
-    const textResponse = data.choices[0].message.content;
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts) {
+      throw new Error('Gemini API beklenen formatta yanıt vermedi.');
+    }
+
+    const textResponse = data.candidates[0].content.parts[0].text;
     const cleanJsonString = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
     
     let parsedArray = [];
@@ -220,14 +227,16 @@ Format şu olmalı:
       }
     } catch (e) {
       console.error("Vision JSON Parse Hatası:", e, textResponse);
-      throw new Error("Görüntü analiz edilemedi.");
+      throw new Error("JSON Hatası: " + e.message);
     }
 
     const formattedItems = parsedArray.map((parsedItem, index) => ({
       id: `vision_${Date.now()}_${index}`,
-      name: parsedItem.name || 'Görselden Tanınan Yemek',
-      type: 'Yapay Zeka (Görsel)',
-      description: `Tabak Porsiyonu: ${parsedItem.calories} kcal | P: ${parsedItem.protein}g | K: ${parsedItem.carbs}g | Y: ${parsedItem.fat}g`,
+      name: parsedItem.name || (language === 'en' ? 'Food Recognized from Image' : 'Görselden Tanınan Yemek'),
+      type: language === 'en' ? 'AI (Vision)' : 'Yapay Zeka (Görsel)',
+      description: language === 'en' 
+        ? `Plate Portion: ${parsedItem.calories} kcal | P: ${parsedItem.protein}g | C: ${parsedItem.carbs}g | F: ${parsedItem.fat}g`
+        : `Tabak Porsiyonu: ${parsedItem.calories} kcal | P: ${parsedItem.protein}g | K: ${parsedItem.carbs}g | Y: ${parsedItem.fat}g`,
       baseAmount: 1,
       pieceWeight: parsedItem.pieceWeight ? Number(parsedItem.pieceWeight) : 0,
       portionWeight: parsedItem.portionWeight ? Number(parsedItem.portionWeight) : 250,
@@ -241,7 +250,7 @@ Format şu olmalı:
 
     return formattedItems;
   } catch (error) {
-    console.error('Resim Analiz Hatası:', error);
-    throw new Error('Yapay zeka bu yemeği analiz edemedi veya bağlantı koptu.');
+    console.error('Resim Analiz Hatası:', error.message || error);
+    throw new Error('API Hatası: ' + (error.message || 'Bilinmeyen Hata'));
   }
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Modal, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Modal, Dimensions, Platform, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,6 +7,7 @@ import Slider from '@react-native-community/slider';
 import { useTranslation } from 'react-i18next';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import Toast from 'react-native-toast-message';
 
 import { useThemeColors } from '../hooks/useThemeColors';
 import { searchFood, searchFoodByBarcode, analyzeFoodFromImage } from '../services/foodService';
@@ -26,7 +27,7 @@ const useDebounce = (value, delay) => {
 };
 
 export default function MealsScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigation = useNavigation();
   const route = useRoute();
   const mealType = route.params?.mealType || 'breakfast'; // default
@@ -62,7 +63,7 @@ export default function MealsScreen() {
       setLoading(true);
       setErrorMsg(null);
       try {
-        const data = await searchFood(debouncedQuery);
+        const data = await searchFood(debouncedQuery, i18n.language);
         setResults(data || []);
       } catch (err) {
         setErrorMsg(t('meals.aiError'));
@@ -115,7 +116,6 @@ export default function MealsScreen() {
     const finalAmountGram = unit === 'gram' ? amount : amount * (selectedFood.pieceWeight || selectedFood.portionWeight || 100);
     
     addFood({
-      id: Date.now().toString(),
       name: selectedFood.name,
       mealType,
       calories: currentMacros.cals,
@@ -123,7 +123,7 @@ export default function MealsScreen() {
       carbs: currentMacros.c,
       fat: currentMacros.f,
       amount: finalAmountGram,
-      source: 'AI'
+      originalFood: selectedFood
     });
     
     navigation.goBack();
@@ -133,7 +133,7 @@ export default function MealsScreen() {
     try {
       let result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
+        allowsEditing: false, // Devre dışı bırakıldı çünkü native UI İngilizce ve sorunlu
         quality: 0.5,
         base64: true,
       });
@@ -141,16 +141,18 @@ export default function MealsScreen() {
       if (!result.canceled && result.assets[0].base64) {
         setLoading(true);
         setErrorMsg(null);
+        Toast.show({ type: 'info', text1: 'AI', text2: t('common.loading') || 'Analiz ediliyor...' });
         try {
-          const data = await analyzeFoodFromImage(result.assets[0].base64);
+          const data = await analyzeFoodFromImage(result.assets[0].base64, i18n.language);
           if (data && data.length > 0) {
             setResults(data);
             handleSelectFood(data[0]); // Automatically select the first identified food
           } else {
-            setErrorMsg('Yemek bulunamadı.');
+            setErrorMsg(t('meals.foodNotFound'));
           }
         } catch (err) {
-          setErrorMsg('Resim analiz edilirken bir hata oluştu.');
+          setErrorMsg(t('meals.aiImageError'));
+          Alert.alert(t('meals.errorDetails'), err.message || err.toString());
         } finally {
           setLoading(false);
         }
@@ -172,10 +174,10 @@ export default function MealsScreen() {
         setResults(barcodeResults);
         handleSelectFood(barcodeResults[0]);
       } else {
-        setErrorMsg('Barkod veritabanında bulunamadı.');
+        setErrorMsg(t('meals.barcodeNotFound'));
       }
     } catch (err) {
-      setErrorMsg('Barkod tarama hatası.');
+      setErrorMsg(t('meals.barcodeError'));
     } finally {
       setLoading(false);
       setScanning(false);
@@ -186,7 +188,7 @@ export default function MealsScreen() {
     if (!cameraPermission?.granted) {
       const res = await requestCameraPermission();
       if (!res.granted) {
-        alert('Kamera izni gerekiyor!');
+        alert(t('meals.cameraPermissionRequired'));
         return;
       }
     }
@@ -381,6 +383,7 @@ export default function MealsScreen() {
           <CameraView
             style={{ flex: 1 }}
             facing="back"
+            barcodeScannerEnabled={true}
             barcodeScannerSettings={{
               barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "qr"],
             }}

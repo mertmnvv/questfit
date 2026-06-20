@@ -172,7 +172,7 @@ export default function QuestScreen() {
     Toast.show({
       type: 'success',
       text1: `+${xpReward} XP! 🎯`,
-      text2: t('common.back') === 'Geri' ? `"${title}" hedefi tamamlandı!` : `"${title}" goal completed!`,
+      text2: t('quests.goalCompleted', { title }),
       position: 'top',
       topOffset: 60,
     });
@@ -220,7 +220,7 @@ export default function QuestScreen() {
 
           {/* Goals Checklist Title */}
           <Text style={styles.sectionTitle}>
-            {t('common.back') === 'Geri' ? 'Günlük Hedef Listen' : 'Your Daily Targets'}
+            {t('quests.dailyTargetsTitle')}
           </Text>
 
           {/* Goals Stack */}
@@ -304,7 +304,7 @@ export default function QuestScreen() {
                     <View style={styles.inProgressBadge}>
                       <MaterialCommunityIcons name="progress-clock" size={16} color={COLORS_THEME.textSecondary} style={{ marginRight: 4 }} />
                       <Text style={styles.inProgressText}>
-                        {t('common.back') === 'Geri' ? 'Devam Ediyor' : 'In Progress'}
+                        {t('quests.inProgress')}
                       </Text>
                     </View>
                   )}

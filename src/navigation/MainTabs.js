@@ -9,6 +9,7 @@ import DashboardScreen from '../screens/DashboardScreen';
 import QuestScreen from '../screens/QuestScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import WorkoutsScreen from '../screens/WorkoutsScreen';
+import CommunityScreen from '../screens/CommunityScreen';
 
 import { SHADOWS, BORDER_RADIUS } from '../theme';
 
@@ -37,6 +38,8 @@ export default function MainTabs() {
             iconName = focused ? 'shield-checkmark' : 'shield-checkmark-outline';
           } else if (route.name === 'WorkoutsTab') {
             iconName = focused ? 'barbell' : 'barbell-outline';
+          } else if (route.name === 'CommunityTab') {
+            iconName = focused ? 'people' : 'people-outline';
           } else if (route.name === 'ProfileTab') {
             iconName = focused ? 'person' : 'person-outline';
           }
@@ -68,6 +71,10 @@ export default function MainTabs() {
       <Tab.Screen 
         name="WorkoutsTab" 
         component={WorkoutsScreen} 
+      />
+      <Tab.Screen 
+        name="CommunityTab" 
+        component={CommunityScreen} 
       />
       <Tab.Screen 
         name="ProfileTab" 

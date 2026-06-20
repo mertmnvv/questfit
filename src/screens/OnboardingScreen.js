@@ -6,13 +6,18 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { useThemeColors } from '../hooks/useThemeColors';
 import { SPACING, FONT_SIZE, BORDER_RADIUS, TYPOGRAPHY } from '../theme';
 import { useAuth } from '../context/AuthContext';
 import { saveUserProfile } from '../services/userService';
 import { logoutUser } from '../services/authService';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+
+const GREEN_PRIMARY = '#40C057';
+const GREEN_DARK = '#2F9E44';
 
 export default function OnboardingScreen({ navigation }) {
   const { t } = useTranslation();
@@ -54,14 +59,14 @@ export default function OnboardingScreen({ navigation }) {
   const animateNext = (nextStep) => {
     Keyboard.dismiss();
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: -50, duration: 150, useNativeDriver: true })
+      Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: -30, duration: 200, useNativeDriver: true })
     ]).start(() => {
       setCurrentStep(nextStep);
-      slideAnim.setValue(50);
+      slideAnim.setValue(30);
       Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: 0, duration: 250, useNativeDriver: true })
+        Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true })
       ]).start();
     });
   };
@@ -69,14 +74,14 @@ export default function OnboardingScreen({ navigation }) {
   const animateBack = (prevStep) => {
     Keyboard.dismiss();
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 50, duration: 150, useNativeDriver: true })
+      Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 30, duration: 200, useNativeDriver: true })
     ]).start(() => {
       setCurrentStep(prevStep);
-      slideAnim.setValue(-50);
+      slideAnim.setValue(-30);
       Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: 0, duration: 250, useNativeDriver: true })
+        Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true })
       ]).start();
     });
   };
@@ -87,7 +92,7 @@ export default function OnboardingScreen({ navigation }) {
       setSaving(true);
       try {
         await saveUserProfile(user.uid, {
-          email: user.email, nickname: user.displayName || 'Hero',
+          email: user.email, nickname: user.displayName || 'Kahraman',
           gender: formData.gender, age: parseInt(formData.age),
           height: parseInt(formData.height), weight: parseFloat(formData.weight),
           bodyType: formData.bodyType, goal: formData.goal,
@@ -105,38 +110,43 @@ export default function OnboardingScreen({ navigation }) {
   };
 
   const renderGenderStep = () => (
-    <View style={styles.cardContainer}>
-      <TouchableOpacity style={[styles.cardBtn, formData.gender === 'male' && styles.cardBtnActive]} onPress={() => setFormData({...formData, gender: 'male'})} activeOpacity={0.8}>
-        <MaterialCommunityIcons name="gender-male" size={48} color={formData.gender === 'male' ? COLORS.primary : COLORS.textMuted} />
-        <Text style={[styles.cardText, formData.gender === 'male' && styles.cardTextActive]}>{t('onboarding.male')}</Text>
+    <View style={styles.glassContainerRow}>
+      <TouchableOpacity style={[styles.glassBtn, formData.gender === 'male' && styles.glassBtnActive]} onPress={() => setFormData({...formData, gender: 'male'})} activeOpacity={0.8}>
+        <MaterialCommunityIcons name="gender-male" size={64} color={formData.gender === 'male' ? GREEN_PRIMARY : COLORS.textMuted} />
+        <Text style={[styles.glassText, formData.gender === 'male' && styles.glassTextActive]}>{t('onboarding.male')}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.cardBtn, formData.gender === 'female' && styles.cardBtnActive]} onPress={() => setFormData({...formData, gender: 'female'})} activeOpacity={0.8}>
-        <MaterialCommunityIcons name="gender-female" size={48} color={formData.gender === 'female' ? COLORS.primary : COLORS.textMuted} />
-        <Text style={[styles.cardText, formData.gender === 'female' && styles.cardTextActive]}>{t('onboarding.female')}</Text>
+      <TouchableOpacity style={[styles.glassBtn, formData.gender === 'female' && styles.glassBtnActive]} onPress={() => setFormData({...formData, gender: 'female'})} activeOpacity={0.8}>
+        <MaterialCommunityIcons name="gender-female" size={64} color={formData.gender === 'female' ? GREEN_PRIMARY : COLORS.textMuted} />
+        <Text style={[styles.glassText, formData.gender === 'female' && styles.glassTextActive]}>{t('onboarding.female')}</Text>
       </TouchableOpacity>
     </View>
   );
 
   const renderAgeStep = () => (
-    <View style={styles.inputCard}>
-      <MaterialCommunityIcons name="calendar-account" size={32} color={COLORS.textMuted} style={{marginBottom: SPACING.md}} />
-      <TextInput style={styles.largeInput} keyboardType="numeric" placeholder="25" placeholderTextColor={COLORS.border} value={formData.age} onChangeText={(val) => setFormData({...formData, age: val})} autoFocus />
-      <Text style={styles.unitText}>{t('onboarding.ageUnit')}</Text>
+    <View style={styles.floatingInputWrapper}>
+      <TextInput style={styles.massiveInput} keyboardType="numeric" placeholder="0" placeholderTextColor={COLORS.textMuted} value={formData.age} onChangeText={(val) => setFormData({...formData, age: val})} autoFocus maxLength={3} />
+      <Text style={styles.massiveUnit}>{t('onboarding.ageUnit')}</Text>
+      <View style={styles.floatingLine} />
     </View>
   );
 
   const renderBodyStep = () => (
-    <View style={styles.inputCardRow}>
-      <View style={styles.inputCol}>
-        <Text style={styles.colLabel}>{t('onboarding.height')}</Text>
-        <TextInput style={styles.largeInput} keyboardType="numeric" placeholder="175" placeholderTextColor={COLORS.border} value={formData.height} onChangeText={(val) => setFormData({...formData, height: val})} autoFocus />
-        <Text style={styles.unitText}>cm</Text>
+    <View style={styles.glassContainerRow}>
+      <View style={styles.floatingInputCol}>
+        <Text style={styles.floatingLabel}>{t('onboarding.height')}</Text>
+        <View style={styles.floatingInputRow}>
+          <TextInput style={styles.massiveInput} keyboardType="numeric" placeholder="0" placeholderTextColor={COLORS.textMuted} value={formData.height} onChangeText={(val) => setFormData({...formData, height: val})} autoFocus maxLength={3} />
+          <Text style={styles.massiveUnit}>cm</Text>
+        </View>
+        <View style={styles.floatingLine} />
       </View>
-      <View style={styles.divider} />
-      <View style={styles.inputCol}>
-        <Text style={styles.colLabel}>{t('onboarding.weight')}</Text>
-        <TextInput style={styles.largeInput} keyboardType="numeric" placeholder="70" placeholderTextColor={COLORS.border} value={formData.weight} onChangeText={(val) => setFormData({...formData, weight: val})} />
-        <Text style={styles.unitText}>kg</Text>
+      <View style={styles.floatingInputCol}>
+        <Text style={styles.floatingLabel}>{t('onboarding.weight')}</Text>
+        <View style={styles.floatingInputRow}>
+          <TextInput style={styles.massiveInput} keyboardType="numeric" placeholder="0" placeholderTextColor={COLORS.textMuted} value={formData.weight} onChangeText={(val) => setFormData({...formData, weight: val})} maxLength={5} />
+          <Text style={styles.massiveUnit}>kg</Text>
+        </View>
+        <View style={styles.floatingLine} />
       </View>
     </View>
   );
@@ -144,21 +154,25 @@ export default function OnboardingScreen({ navigation }) {
   const renderBodyTypeStep = () => {
     const isFemale = formData.gender === 'female';
     const bodyTypes = [
-      { id: 'ectomorph', title: t('onboarding.ectomorph'), icon: isFemale ? require('../../assets/body_ecto_female.jpg') : require('../../assets/body_ecto_male.jpg'), desc: t('onboarding.ectoDesc') },
-      { id: 'mesomorph', title: t('onboarding.mesomorph'), icon: isFemale ? require('../../assets/body_meso_female.jpg') : require('../../assets/body_meso_male.jpg'), desc: t('onboarding.mesoDesc') },
-      { id: 'endomorph', title: t('onboarding.endomorph'), icon: isFemale ? require('../../assets/body_endo_female.jpg') : require('../../assets/body_endo_male.jpg'), desc: t('onboarding.endoDesc') }
+      { id: 'ectomorph', title: t('onboarding.ectomorph'), icon: isFemale ? require('../../assets/body_ecto_female.png') : require('../../assets/body_ecto_male.png'), desc: t('onboarding.ectoDesc') },
+      { id: 'mesomorph', title: t('onboarding.mesomorph'), icon: isFemale ? require('../../assets/body_meso_female.png') : require('../../assets/body_meso_male.png'), desc: t('onboarding.mesoDesc') },
+      { id: 'endomorph', title: t('onboarding.endomorph'), icon: isFemale ? require('../../assets/body_endo_female.png') : require('../../assets/body_endo_male.png'), desc: t('onboarding.endoDesc') }
     ];
 
     return (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollCardContainer} decelerationRate="fast" snapToInterval={width * 0.75 + SPACING.md}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollGlassContainer} decelerationRate="fast" snapToInterval={width * 0.75 + SPACING.md}>
         {bodyTypes.map(bt => (
-          <TouchableOpacity key={bt.id} style={[styles.bodyTypeCard, formData.bodyType === bt.id && styles.bodyTypeCardActive]} onPress={() => setFormData({...formData, bodyType: bt.id})} activeOpacity={0.8}>
-            <Image source={bt.icon} style={styles.bodyTypeImage} resizeMode="cover" />
-            <View style={styles.bodyTypeInfo}>
-              <Text style={[styles.bodyTypeTitle, formData.bodyType === bt.id && styles.bodyTypeTitleActive]}>{bt.title}</Text>
-              <Text style={styles.bodyTypeDesc}>{bt.desc}</Text>
+          <TouchableOpacity key={bt.id} style={[styles.glassBodyCard, formData.bodyType === bt.id && styles.glassBodyCardActive]} onPress={() => setFormData({...formData, bodyType: bt.id})} activeOpacity={0.8}>
+            <Image source={bt.icon} style={styles.glassBodyImage} resizeMode="contain" />
+            <View style={styles.glassBodyInfo}>
+              <Text style={[styles.glassBodyTitle, formData.bodyType === bt.id && styles.glassBodyTitleActive]}>{bt.title}</Text>
+              <Text style={styles.glassBodyDesc}>{bt.desc}</Text>
             </View>
-            {formData.bodyType === bt.id && <View style={styles.selectedIcon}><MaterialCommunityIcons name="check-circle" size={28} color={COLORS.primary} /></View>}
+            {formData.bodyType === bt.id && (
+              <View style={styles.selectedGlow}>
+                <MaterialCommunityIcons name="check" size={24} color="#FFF" />
+              </View>
+            )}
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -166,36 +180,42 @@ export default function OnboardingScreen({ navigation }) {
   };
 
   const renderGoalStep = () => (
-    <View style={styles.listContainer}>
-      <TouchableOpacity style={[styles.listBtn, formData.goal === 'lose' && styles.listBtnActive]} onPress={() => setFormData({...formData, goal: 'lose'})} activeOpacity={0.8}>
-        <Text style={[styles.listTitle, formData.goal === 'lose' && styles.listTitleActive]}>{t('onboarding.goalLose')}</Text>
-        <Text style={styles.listDesc}>{t('onboarding.goalLoseDesc')}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.listBtn, formData.goal === 'maintain' && styles.listBtnActive]} onPress={() => setFormData({...formData, goal: 'maintain'})} activeOpacity={0.8}>
-        <Text style={[styles.listTitle, formData.goal === 'maintain' && styles.listTitleActive]}>{t('onboarding.goalMaintain')}</Text>
-        <Text style={styles.listDesc}>{t('onboarding.goalMaintainDesc')}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.listBtn, formData.goal === 'gain' && styles.listBtnActive]} onPress={() => setFormData({...formData, goal: 'gain'})} activeOpacity={0.8}>
-        <Text style={[styles.listTitle, formData.goal === 'gain' && styles.listTitleActive]}>{t('onboarding.goalGain')}</Text>
-        <Text style={styles.listDesc}>{t('onboarding.goalGainDesc')}</Text>
-      </TouchableOpacity>
+    <View style={styles.glassListContainer}>
+      {['lose', 'maintain', 'gain'].map((goalKey) => {
+        const goalMap = {
+          'lose': { title: t('onboarding.goalLose'), desc: t('onboarding.goalLoseDesc') },
+          'maintain': { title: t('onboarding.goalMaintain'), desc: t('onboarding.goalMaintainDesc') },
+          'gain': { title: t('onboarding.goalGain'), desc: t('onboarding.goalGainDesc') }
+        };
+        const isActive = formData.goal === goalKey;
+        return (
+          <TouchableOpacity key={goalKey} style={[styles.glassListBtn, isActive && styles.glassListBtnActive]} onPress={() => setFormData({...formData, goal: goalKey})} activeOpacity={0.8}>
+            {isActive && <View style={styles.activeLineIndicator} />}
+            <Text style={[styles.glassListTitle, isActive && styles.glassListTitleActive]}>{goalMap[goalKey].title}</Text>
+            <Text style={styles.glassListDesc}>{goalMap[goalKey].desc}</Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 
   const renderDietStep = () => (
-    <View style={styles.listContainer}>
-      <TouchableOpacity style={[styles.listBtn, formData.dietTiming === 'standard' && styles.listBtnActive]} onPress={() => setFormData({...formData, dietTiming: 'standard'})} activeOpacity={0.8}>
-        <Text style={[styles.listTitle, formData.dietTiming === 'standard' && styles.listTitleActive]}>{t('onboarding.dietStandard')}</Text>
-        <Text style={styles.listDesc}>{t('onboarding.dietStandardDesc')}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.listBtn, formData.dietTiming === 'if' && styles.listBtnActive]} onPress={() => setFormData({...formData, dietTiming: 'if'})} activeOpacity={0.8}>
-        <Text style={[styles.listTitle, formData.dietTiming === 'if' && styles.listTitleActive]}>{t('onboarding.dietIF')}</Text>
-        <Text style={styles.listDesc}>{t('onboarding.dietIFDesc')}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.listBtn, formData.dietTiming === 'omad' && styles.listBtnActive]} onPress={() => setFormData({...formData, dietTiming: 'omad'})} activeOpacity={0.8}>
-        <Text style={[styles.listTitle, formData.dietTiming === 'omad' && styles.listTitleActive]}>{t('onboarding.dietOMAD')}</Text>
-        <Text style={styles.listDesc}>{t('onboarding.dietOMADDesc')}</Text>
-      </TouchableOpacity>
+    <View style={styles.glassListContainer}>
+      {['standard', 'if', 'omad'].map((dietKey) => {
+        const dietMap = {
+          'standard': { title: t('onboarding.dietStandard'), desc: t('onboarding.dietStandardDesc') },
+          'if': { title: t('onboarding.dietIF'), desc: t('onboarding.dietIFDesc') },
+          'omad': { title: t('onboarding.dietOMAD'), desc: t('onboarding.dietOMADDesc') }
+        };
+        const isActive = formData.dietTiming === dietKey;
+        return (
+          <TouchableOpacity key={dietKey} style={[styles.glassListBtn, isActive && styles.glassListBtnActive]} onPress={() => setFormData({...formData, dietTiming: dietKey})} activeOpacity={0.8}>
+            {isActive && <View style={styles.activeLineIndicator} />}
+            <Text style={[styles.glassListTitle, isActive && styles.glassListTitleActive]}>{dietMap[dietKey].title}</Text>
+            <Text style={styles.glassListDesc}>{dietMap[dietKey].desc}</Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 
@@ -211,9 +231,14 @@ export default function OnboardingScreen({ navigation }) {
     }
   };
 
+  const isDark = COLORS.background === '#0D1117';
+  const gradientColors = isDark 
+    ? ['#0D1117', '#0A1A10', '#0D1117'] 
+    : ['#FFFFFF', '#E8F5E9', '#FFFFFF'];
+
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle={COLORS.background === '#0D1117' ? 'light-content' : 'dark-content'} backgroundColor={COLORS.background} />
+    <LinearGradient colors={gradientColors} style={styles.container}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
       
       <View style={styles.topBar}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
@@ -243,71 +268,74 @@ export default function OnboardingScreen({ navigation }) {
         </View>
 
         <View style={styles.footer}>
-          <TouchableOpacity style={[styles.nextButton, (!isStepValid() || saving) && styles.nextButtonDisabled]} onPress={handleNext} disabled={!isStepValid() || saving} activeOpacity={0.8}>
-            {saving ? <ActivityIndicator color={COLORS.background} /> : <Text style={styles.nextText}>{currentStep === STEPS.length - 1 ? t('common.save') : t('common.next')}</Text>}
+          <TouchableOpacity style={[styles.primaryBtn, (!isStepValid() || saving) && styles.primaryBtnDisabled]} onPress={handleNext} disabled={!isStepValid() || saving} activeOpacity={0.8}>
+            {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryBtnText}>{currentStep === STEPS.length - 1 ? t('common.save') : t('common.next')}</Text>}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </View>
+    </LinearGradient>
   );
 }
 
 const getStyles = (COLORS) => {
   const isDark = COLORS.background === '#0D1117';
+  const glassBgColor = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
+  const borderLineColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
   
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
+    container: { flex: 1 },
     topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: Platform.OS === 'ios' ? 60 : StatusBar.currentHeight + 20, paddingBottom: SPACING.md },
     backButton: { padding: SPACING.xs },
     progressTextContainer: { flex: 1, alignItems: 'center', marginRight: 36 },
-    stepIndicator: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 10, color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 1 },
-    progressBar: { height: 3, backgroundColor: COLORS.border, marginHorizontal: SPACING.xl, borderRadius: 2, overflow: 'hidden' },
-    progressFill: { height: '100%', backgroundColor: COLORS.primary },
+    stepIndicator: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 12, color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 2 },
+    progressBar: { height: 2, backgroundColor: glassBgColor, marginHorizontal: SPACING.xl, borderRadius: 1, overflow: 'hidden' },
+    progressFill: { height: '100%', backgroundColor: GREEN_PRIMARY },
     content: { flex: 1 },
     animContainer: { flex: 1 },
-    header: { paddingHorizontal: SPACING.xl, marginTop: SPACING.xxl, marginBottom: SPACING.xl },
-    stepTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 32, color: COLORS.text, letterSpacing: 1 },
-    stepSubtitle: { fontFamily: TYPOGRAPHY.fontFamily.regular, fontSize: FONT_SIZE.md, color: COLORS.textSecondary, marginTop: SPACING.xs },
-    stepContentWrapper: { flex: 1, justifyContent: 'center', paddingHorizontal: SPACING.xl },
+    header: { paddingHorizontal: SPACING.xl, marginTop: SPACING.xxl, marginBottom: SPACING.xl, alignItems: 'center' },
+    stepTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 32, color: COLORS.text, letterSpacing: 1, textAlign: 'center' },
+    stepSubtitle: { fontFamily: TYPOGRAPHY.fontFamily.regular, fontSize: FONT_SIZE.md, color: COLORS.textSecondary, marginTop: SPACING.xs, textAlign: 'center' },
+    stepContentWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: SPACING.xl },
     
-    // Cards for Gender
-    cardContainer: { flexDirection: 'row', gap: SPACING.lg },
-    cardBtn: { flex: 1, backgroundColor: COLORS.card, borderRadius: BORDER_RADIUS.xl, padding: SPACING.xxl, alignItems: 'center', borderWidth: 2, borderColor: isDark ? 'rgba(255,255,255,0.05)' : COLORS.border, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
-    cardBtnActive: { borderColor: COLORS.primary, backgroundColor: isDark ? '#19262B' : '#F5FBF6', shadowColor: COLORS.primary, shadowOpacity: 0.2, shadowRadius: 10, elevation: 0 },
-    cardText: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.md, color: COLORS.textSecondary, marginTop: SPACING.md },
-    cardTextActive: { color: COLORS.primary },
+    // Glassmorphism Gender
+    glassContainerRow: { flexDirection: 'row', gap: SPACING.lg, width: '100%', justifyContent: 'center' },
+    glassBtn: { flex: 1, maxWidth: 160, aspectRatio: 1, borderRadius: BORDER_RADIUS.full, padding: SPACING.xl, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1, borderColor: borderLineColor, borderStyle: 'dashed' },
+    glassBtnActive: { borderColor: GREEN_PRIMARY, backgroundColor: glassBgColor, borderStyle: 'solid', shadowColor: GREEN_PRIMARY, shadowOpacity: 0.1, shadowRadius: 15, elevation: 0 },
+    glassText: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.lg, color: COLORS.textMuted, marginTop: SPACING.md, letterSpacing: 1 },
+    glassTextActive: { color: GREEN_PRIMARY },
 
-    // Input Cards for Age, Height, Weight
-    inputCard: { backgroundColor: COLORS.card, borderRadius: BORDER_RADIUS.xl, padding: SPACING.xxl, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
-    inputCardRow: { flexDirection: 'row', backgroundColor: COLORS.card, borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'space-around' },
-    inputCol: { alignItems: 'center', flex: 1 },
-    colLabel: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 10, color: COLORS.textMuted, textTransform: 'uppercase', marginBottom: SPACING.md },
-    divider: { width: 1, height: 60, backgroundColor: COLORS.border },
-    largeInput: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 48, color: COLORS.text, padding: 0, margin: 0, textAlign: 'center', minWidth: 100 },
-    unitText: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.sm, color: COLORS.primary, marginTop: SPACING.xs, textTransform: 'uppercase' },
+    // Floating Inputs for Age, Height, Weight
+    floatingInputWrapper: { alignItems: 'center', justifyContent: 'center' },
+    floatingInputCol: { alignItems: 'center', flex: 1 },
+    floatingInputRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center' },
+    floatingLabel: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 12, color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 2, marginBottom: SPACING.sm },
+    massiveInput: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 64, color: COLORS.text, padding: 0, margin: 0, textAlign: 'center', minWidth: 80 },
+    massiveUnit: { fontFamily: TYPOGRAPHY.fontFamily.regular, fontSize: FONT_SIZE.lg, color: COLORS.textMuted, marginBottom: 12, marginLeft: 4 },
+    floatingLine: { height: 2, width: 100, backgroundColor: borderLineColor, marginTop: SPACING.md },
 
-    // Horizontal Scroll Cards for Body Types
-    scrollCardContainer: { paddingVertical: SPACING.sm, gap: SPACING.md },
-    bodyTypeCard: { width: width * 0.75, backgroundColor: COLORS.card, borderRadius: BORDER_RADIUS.xl, borderWidth: 2, borderColor: isDark ? 'rgba(255,255,255,0.05)' : COLORS.border, position: 'relative', overflow: 'hidden' },
-    bodyTypeCardActive: { borderColor: COLORS.primary, shadowColor: COLORS.primary, shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 0 },
-    bodyTypeImage: { width: '100%', height: 240, backgroundColor: '#000000' },
-    bodyTypeInfo: { padding: SPACING.xl },
-    bodyTypeTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.xl, color: COLORS.text, marginBottom: SPACING.xs },
-    bodyTypeTitleActive: { color: COLORS.primary },
-    bodyTypeDesc: { fontFamily: TYPOGRAPHY.fontFamily.regular, fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, lineHeight: 20 },
-    selectedIcon: { position: 'absolute', top: SPACING.md, right: SPACING.md, backgroundColor: COLORS.card, borderRadius: 14, overflow: 'hidden' },
+    // Glassmorphism Body Types
+    scrollGlassContainer: { paddingVertical: SPACING.md, gap: SPACING.lg, paddingHorizontal: SPACING.xl },
+    glassBodyCard: { width: width * 0.7, alignItems: 'center', position: 'relative', opacity: 0.6 },
+    glassBodyCardActive: { opacity: 1 },
+    glassBodyImage: { width: '100%', height: 300 },
+    glassBodyInfo: { alignItems: 'center', marginTop: SPACING.xl },
+    glassBodyTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 24, color: COLORS.text, letterSpacing: 1, marginBottom: SPACING.xs },
+    glassBodyTitleActive: { color: GREEN_PRIMARY },
+    glassBodyDesc: { fontFamily: TYPOGRAPHY.fontFamily.regular, fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 22 },
+    selectedGlow: { position: 'absolute', top: '40%', backgroundColor: GREEN_PRIMARY, borderRadius: 20, width: 40, height: 40, alignItems: 'center', justifyContent: 'center', shadowColor: GREEN_PRIMARY, shadowOpacity: 0.5, shadowRadius: 10, elevation: 5 },
 
-    // List Cards for Goal & Diet
-    listContainer: { gap: SPACING.md },
-    listBtn: { backgroundColor: COLORS.card, borderRadius: BORDER_RADIUS.lg, padding: SPACING.xl, borderWidth: 1, borderColor: COLORS.border },
-    listBtnActive: { borderColor: COLORS.primary, backgroundColor: isDark ? '#19262B' : '#F5FBF6', elevation: 0 },
-    listTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.lg, color: COLORS.text, marginBottom: 4 },
-    listTitleActive: { color: COLORS.primary },
-    listDesc: { fontFamily: TYPOGRAPHY.fontFamily.regular, fontSize: FONT_SIZE.xs, color: COLORS.textSecondary },
+    // Sleek Lists for Goal & Diet
+    glassListContainer: { width: '100%', gap: SPACING.lg },
+    glassListBtn: { width: '100%', paddingVertical: SPACING.xl, paddingHorizontal: SPACING.lg, backgroundColor: 'transparent', position: 'relative' },
+    glassListBtnActive: { backgroundColor: glassBgColor },
+    activeLineIndicator: { position: 'absolute', left: 0, top: '20%', bottom: '20%', width: 4, backgroundColor: GREEN_PRIMARY, borderRadius: 2 },
+    glassListTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 22, color: COLORS.textMuted, marginBottom: 6, letterSpacing: 1 },
+    glassListTitleActive: { color: COLORS.text },
+    glassListDesc: { fontFamily: TYPOGRAPHY.fontFamily.regular, fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, lineHeight: 20 },
 
     footer: { paddingHorizontal: SPACING.xl, paddingBottom: Platform.OS === 'ios' ? 40 : SPACING.xxl, paddingTop: SPACING.lg },
-    nextButton: { backgroundColor: COLORS.text, height: 64, borderRadius: BORDER_RADIUS.full, justifyContent: 'center', alignItems: 'center', shadowColor: COLORS.text, shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: {width:0, height:5} },
-    nextButtonDisabled: { opacity: 0.5 },
-    nextText: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.md, color: COLORS.background, textTransform: 'uppercase', letterSpacing: 1 },
+    primaryBtn: { backgroundColor: GREEN_PRIMARY, height: 64, borderRadius: BORDER_RADIUS.full, justifyContent: 'center', alignItems: 'center', shadowColor: GREEN_DARK, shadowOpacity: 0.4, shadowRadius: 15, shadowOffset: { width: 0, height: 8 }, elevation: 8, width: '100%' },
+    primaryBtnDisabled: { opacity: 0.3, shadowOpacity: 0 },
+    primaryBtnText: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.md, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 3 },
   });
 };

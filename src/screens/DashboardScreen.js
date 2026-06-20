@@ -152,7 +152,7 @@ export default function DashboardScreen() {
 
         const history = weightHistory || [];
         if (history.length === 0) {
-          setWeightModalVisible(true);
+          // Yeni kullanıcıları kurulumdan hemen sonra darlamamak için bu ekranı gösterme
           return;
         }
         const lastEntry = history[history.length - 1];

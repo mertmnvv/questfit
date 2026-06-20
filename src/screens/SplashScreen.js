@@ -17,10 +17,10 @@ import { SPACING, FONT_SIZE, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../theme
 
 const { width } = Dimensions.get('window');
 
-// GOLD THEME COLORS
-const GOLD_PRIMARY = '#F5A623';
-const GOLD_LIGHT = '#FFD700';
-const GOLD_DARK = '#B8860B';
+// GREEN THEME COLORS
+const GREEN_PRIMARY = '#40C057';
+const GREEN_LIGHT = '#69DB7C';
+const GREEN_DARK = '#2F9E44';
 
 export default function SplashScreen() {
   const COLORS = useThemeColors();
@@ -94,34 +94,26 @@ export default function SplashScreen() {
         <View style={styles.centerContent}>
           
           <View style={styles.logoWrapper}>
-            {/* Pulsing Aura Ring */}
-            <Animated.View style={[styles.auraRing, ringStyle, { backgroundColor: COLORS.background === '#0D1117' ? 'rgba(245, 166, 35, 0.15)' : 'rgba(245, 166, 35, 0.25)' }]} />
-            
-            {/* Main Emblem */}
-            <Animated.View style={[styles.emblemContainer, logoStyle, { shadowColor: GOLD_PRIMARY }]}>
-              <LinearGradient
-                colors={[COLORS.card, COLORS.background]}
-                style={styles.emblemInner}
-              >
-                <MaterialCommunityIcons name="sword-cross" size={64} color={GOLD_PRIMARY} />
-              </LinearGradient>
+            {/* Main Emblem Image with pulsing scale */}
+            <Animated.View style={[styles.emblemContainer, logoStyle]}>
+              <Animated.Image 
+                source={require('../../assets/splash.png')} 
+                style={[styles.splashImage, ringStyle]} 
+                resizeMode="contain"
+              />
             </Animated.View>
           </View>
 
           {/* Typography */}
           <Animated.View style={[styles.textWrapper, textStyle]}>
-            <Text style={[styles.title, { textShadowColor: COLORS.background === '#0D1117' ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)' }]}>
-              <Text style={{ color: COLORS.text }}>QUEST</Text>
-              <Text style={{ color: GOLD_PRIMARY }}>FIT</Text>
-            </Text>
-            <Text style={[styles.subtitle, { color: GOLD_DARK }]}>Maceraya Hazırlanılıyor...</Text>
+            <Text style={[styles.subtitle, { color: GREEN_DARK }]}>Sağlıklı Yaşama Adım Atılıyor...</Text>
           </Animated.View>
 
-          {/* Gold EXP Loading Bar */}
+          {/* Green Loading Bar */}
           <View style={[styles.loaderBg, { backgroundColor: COLORS.border, borderColor: 'transparent' }]}>
             <Animated.View style={[styles.loaderFill, barStyle]}>
               <LinearGradient 
-                colors={[GOLD_DARK, GOLD_PRIMARY, GOLD_LIGHT]} 
+                colors={[GREEN_DARK, GREEN_PRIMARY, GREEN_LIGHT]} 
                 start={{ x: 0, y: 0 }} 
                 end={{ x: 1, y: 0 }} 
                 style={StyleSheet.absoluteFill} 
@@ -155,51 +147,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 40,
-    width: 140,
-    height: 140,
-  },
-  auraRing: {
-    position: 'absolute',
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    borderWidth: 2,
-    borderColor: GOLD_PRIMARY,
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+    width: 250,
+    height: 250,
   },
   emblemContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    padding: 3,
-    backgroundColor: GOLD_DARK, // border-like effect
-    ...SHADOWS.glow,
-    shadowColor: GOLD_PRIMARY,
-    shadowRadius: 20,
-  },
-  emblemInner: {
-    flex: 1,
-    borderRadius: 57,
+    width: 250,
+    height: 250,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  splashImage: {
+    width: '100%',
+    height: '100%',
   },
   textWrapper: {
     alignItems: 'center',
   },
-  title: {
-    fontFamily: TYPOGRAPHY.fontFamily.bold,
-    fontSize: 42,
-    letterSpacing: 4,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 10,
-  },
   subtitle: {
-    fontFamily: TYPOGRAPHY.fontFamily.regular,
+    fontFamily: TYPOGRAPHY.fontFamily.bold,
     fontSize: FONT_SIZE.md,
-    color: GOLD_PRIMARY,
-    marginTop: SPACING.sm,
-    letterSpacing: 2,
+    color: GREEN_PRIMARY,
+    marginTop: SPACING.md,
+    letterSpacing: 1,
     textTransform: 'uppercase',
   },
   loaderBg: {

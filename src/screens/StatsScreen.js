@@ -34,7 +34,7 @@ export default function StatsScreen() {
       Toast.show({
         type: 'success',
         text1: t('common.success'),
-        text2: t('common.back') === 'Geri' ? 'Kilonuz başarıyla güncellendi!' : 'Weight updated successfully!',
+        text2: t('toasts.weightUpdated'),
         position: 'top',
         topOffset: 60,
       });

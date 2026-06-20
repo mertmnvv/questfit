@@ -2,15 +2,24 @@ import React, { useState, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput,
   ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
-  Keyboard, Animated, Dimensions
+  Keyboard, Animated, Dimensions, Image
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useTranslation } from 'react-i18next';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useThemeColors } from '../hooks/useThemeColors';
-import { SPACING, FONT_SIZE, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme';
-import { registerUser, loginUser } from '../services/authService';
+import { SPACING, FONT_SIZE, BORDER_RADIUS, TYPOGRAPHY } from '../theme';
+import { registerUser, loginUser, signInWithGoogle } from '../services/authService';
+import { uploadImageToCloudinary } from '../services/cloudinaryService';
+
+const { width, height } = Dimensions.get('window');
+
+// GREEN THEME COLORS
+const GREEN_PRIMARY = '#40C057';
+const GREEN_DARK = '#2F9E44';
 
 export default function LoginScreen() {
   const { t } = useTranslation();
@@ -18,16 +27,32 @@ export default function LoginScreen() {
   const styles = useMemo(() => getStyles(COLORS), [COLORS]);
 
   const [mode, setMode] = useState('login');
+  
+  // Animations
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   const switchMode = (newMode) => {
     if (mode === newMode) return;
     Keyboard.dismiss();
-    Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
+    
+    // Slide out
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: newMode === 'login' ? -20 : 20, duration: 150, useNativeDriver: true })
+    ]).start(() => {
       setMode(newMode);
       setLoginError('');
       setRegError('');
-      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+      
+      // Prepare for slide in
+      slideAnim.setValue(newMode === 'login' ? 20 : -20);
+      
+      // Slide in
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true })
+      ]).start();
     });
   };
 
@@ -41,8 +66,20 @@ export default function LoginScreen() {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
+  const [regAvatar, setRegAvatar] = useState(null);
   const [regLoading, setRegLoading] = useState(false);
   const [regError, setRegError] = useState('');
+
+  const handlePickRegAvatar = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: false,
+      quality: 0.6,
+    });
+    if (!result.canceled && result.assets?.length > 0) {
+      setRegAvatar(result.assets[0].uri);
+    }
+  };
 
   const handleLoginSubmit = async () => {
     Keyboard.dismiss();
@@ -70,7 +107,11 @@ export default function LoginScreen() {
 
     setRegLoading(true);
     try {
-      await registerUser(emailTrim, regPassword, regNickname.trim());
+      let finalAvatarUrl = null;
+      if (regAvatar) {
+        finalAvatarUrl = await uploadImageToCloudinary(regAvatar);
+      }
+      await registerUser(emailTrim, regPassword, regNickname.trim(), finalAvatarUrl);
       Toast.show({ type: 'success', text1: t('common.success'), text2: t('common.loading') });
     } catch (err) {
       const errCode = err.code || '';
@@ -82,265 +123,320 @@ export default function LoginScreen() {
 
   const handleGoogleSSO = async () => {
     setLoginLoading(true);
-    setTimeout(async () => {
-      try { await loginUser('demo_user@questfit.com', 'QuestFit123'); } 
-      catch (err) { try { await registerUser('demo_user@questfit.com', 'QuestFit123'); } catch (e) { } } 
-      finally { setLoginLoading(false); }
-    }, 1500);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      Toast.show({ type: 'error', text1: 'Hata', text2: 'Google ile giriş başarısız.' });
+      setLoginLoading(false);
+    }
   };
 
+  const isDark = COLORS.background === '#0D1117';
+  const gradientColors = isDark 
+    ? ['#0D1117', '#0A1A10', '#0D1117'] 
+    : ['#FFFFFF', '#E8F5E9', '#FFFFFF'];
+
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle={COLORS.background === '#0D1117' ? 'light-content' : 'dark-content'} backgroundColor={COLORS.background} />
+    <LinearGradient colors={gradientColors} style={styles.container}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
       
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           
-          <View style={styles.header}>
-            <View style={styles.iconContainer}>
-              <MaterialCommunityIcons name="shield-sword" size={48} color={COLORS.primary} />
-            </View>
-            <Text style={styles.title}>{t('login.title')}</Text>
-            <Text style={styles.subtitle}>{t('login.tagline')}</Text>
+          <View style={styles.heroSection}>
+            <Image source={require('../../assets/icon.png')} style={styles.heroLogo} resizeMode="contain" />
+            <Text style={styles.heroTitle}>QUEST FIT</Text>
           </View>
 
-          <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
+          <View style={styles.contentWrapper}>
             
-            <View style={styles.tabContainer}>
-              <TouchableOpacity style={[styles.tab, mode === 'login' && styles.activeTab]} onPress={() => switchMode('login')}>
+            <View style={styles.modernTabContainer}>
+              <TouchableOpacity style={styles.modernTab} onPress={() => switchMode('login')} activeOpacity={0.8}>
                 <Text style={[styles.tabText, mode === 'login' && styles.activeTabText]}>{t('login.login')}</Text>
+                {mode === 'login' && <View style={styles.activeIndicator} />}
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.tab, mode === 'register' && styles.activeTab]} onPress={() => switchMode('register')}>
+              
+              <TouchableOpacity style={styles.modernTab} onPress={() => switchMode('register')} activeOpacity={0.8}>
                 <Text style={[styles.tabText, mode === 'register' && styles.activeTabText]}>{t('login.register')}</Text>
+                {mode === 'register' && <View style={styles.activeIndicator} />}
               </TouchableOpacity>
             </View>
 
-            {mode === 'login' ? (
-              <View>
-                {loginError !== '' && <Text style={styles.errorText}>{loginError}</Text>}
-                
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>{t('login.email')}</Text>
-                  <View style={styles.inputWrapper}>
-                    <MaterialCommunityIcons name="email-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
-                    <TextInput style={styles.input} placeholder={t('login.emailPlaceholder')} placeholderTextColor={COLORS.border} keyboardType="email-address" autoCapitalize="none" value={loginEmail} onChangeText={setLoginEmail} />
+            <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }], flex: 1, width: '100%' }}>
+              {mode === 'login' ? (
+                <View style={styles.formContainer}>
+                  {loginError !== '' && <Text style={styles.errorText}>{loginError}</Text>}
+                  
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>{t('login.email')}</Text>
+                    <View style={styles.inputWrapper}>
+                      <TextInput style={styles.input} placeholder={t('login.emailPlaceholder')} placeholderTextColor={COLORS.textMuted} keyboardType="email-address" autoCapitalize="none" value={loginEmail} onChangeText={setLoginEmail} />
+                    </View>
                   </View>
-                </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>{t('login.password')}</Text>
-                  <View style={styles.inputWrapper}>
-                    <MaterialCommunityIcons name="lock-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
-                    <TextInput style={styles.input} placeholder="••••••••" placeholderTextColor={COLORS.border} secureTextEntry={!showLoginPassword} autoCapitalize="none" value={loginPassword} onChangeText={setLoginPassword} />
-                    <TouchableOpacity onPress={() => setShowLoginPassword(!showLoginPassword)} style={styles.eyeBtn}>
-                      <MaterialCommunityIcons name={showLoginPassword ? 'eye-off' : 'eye'} size={20} color={COLORS.textMuted} />
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>{t('login.password')}</Text>
+                    <View style={styles.inputWrapper}>
+                      <TextInput style={styles.input} placeholder="••••••••" placeholderTextColor={COLORS.textMuted} secureTextEntry={!showLoginPassword} autoCapitalize="none" value={loginPassword} onChangeText={setLoginPassword} />
+                      <TouchableOpacity onPress={() => setShowLoginPassword(!showLoginPassword)} style={styles.eyeBtn}>
+                        <MaterialCommunityIcons name={showLoginPassword ? 'eye-off' : 'eye'} size={20} color={COLORS.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity style={styles.primaryBtn} onPress={handleLoginSubmit} disabled={loginLoading} activeOpacity={0.8}>
+                    {loginLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryBtnText}>{t('login.submitLogin')}</Text>}
+                  </TouchableOpacity>
+
+                </View>
+              ) : (
+                <View style={styles.formContainer}>
+                  {regError !== '' && <Text style={styles.errorText}>{regError}</Text>}
+
+                  <View style={styles.avatarPickerContainer}>
+                    <TouchableOpacity onPress={handlePickRegAvatar} style={styles.avatarPickerBtn}>
+                      {regAvatar ? (
+                        <Image source={{ uri: regAvatar }} style={styles.avatarImage} />
+                      ) : (
+                        <MaterialCommunityIcons name="camera-plus" size={32} color={GREEN_PRIMARY} />
+                      )}
                     </TouchableOpacity>
                   </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>{t('login.nickname')}</Text>
+                    <View style={styles.inputWrapper}>
+                      <TextInput style={styles.input} placeholder={t('login.nicknamePlaceholder')} placeholderTextColor={COLORS.textMuted} autoCapitalize="words" value={regNickname} onChangeText={setRegNickname} />
+                    </View>
+                  </View>
+                  
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>{t('login.email')}</Text>
+                    <View style={styles.inputWrapper}>
+                      <TextInput style={styles.input} placeholder={t('login.emailPlaceholder')} placeholderTextColor={COLORS.textMuted} keyboardType="email-address" autoCapitalize="none" value={regEmail} onChangeText={setRegEmail} />
+                    </View>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>{t('login.password')}</Text>
+                    <View style={styles.inputWrapper}>
+                      <TextInput style={styles.input} placeholder="••••••••" placeholderTextColor={COLORS.textMuted} secureTextEntry={!showRegPassword} autoCapitalize="none" value={regPassword} onChangeText={setRegPassword} />
+                      <TouchableOpacity onPress={() => setShowRegPassword(!showRegPassword)} style={styles.eyeBtn}>
+                        <MaterialCommunityIcons name={showRegPassword ? 'eye-off' : 'eye'} size={20} color={COLORS.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity style={styles.primaryBtn} onPress={handleRegisterSubmit} disabled={regLoading} activeOpacity={0.8}>
+                    {regLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryBtnText}>{t('login.submitRegister')}</Text>}
+                  </TouchableOpacity>
+
                 </View>
+              )}
 
-                <TouchableOpacity style={styles.primaryBtn} onPress={handleLoginSubmit} disabled={loginLoading} activeOpacity={0.8}>
-                  {loginLoading ? <ActivityIndicator color={COLORS.background} /> : <Text style={styles.primaryBtnText}>{t('login.submitLogin')}</Text>}
-                </TouchableOpacity>
-
+              <View style={styles.divider}>
+                <View style={styles.line} />
+                <Text style={styles.orText}>veya</Text>
+                <View style={styles.line} />
               </View>
-            ) : (
-              <View>
-                {regError !== '' && <Text style={styles.errorText}>{regError}</Text>}
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>{t('login.nickname')}</Text>
-                  <View style={styles.inputWrapper}>
-                    <MaterialCommunityIcons name="account-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
-                    <TextInput style={styles.input} placeholder={t('login.nicknamePlaceholder')} placeholderTextColor={COLORS.border} autoCapitalize="words" value={regNickname} onChangeText={setRegNickname} />
-                  </View>
-                </View>
-                
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>{t('login.email')}</Text>
-                  <View style={styles.inputWrapper}>
-                    <MaterialCommunityIcons name="email-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
-                    <TextInput style={styles.input} placeholder={t('login.emailPlaceholder')} placeholderTextColor={COLORS.border} keyboardType="email-address" autoCapitalize="none" value={regEmail} onChangeText={setRegEmail} />
-                  </View>
-                </View>
+              <TouchableOpacity style={styles.ssoBtn} onPress={handleGoogleSSO} activeOpacity={0.8}>
+                <Image source={{uri: 'https://cdn1.iconfinder.com/data/icons/google-s-logo/150/Google_Icons-09-512.png'}} style={styles.googleIcon} />
+                <Text style={styles.ssoBtnText}>Google ile Devam Et</Text>
+              </TouchableOpacity>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>{t('login.password')}</Text>
-                  <View style={styles.inputWrapper}>
-                    <MaterialCommunityIcons name="lock-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
-                    <TextInput style={styles.input} placeholder="••••••••" placeholderTextColor={COLORS.border} secureTextEntry={!showRegPassword} autoCapitalize="none" value={regPassword} onChangeText={setRegPassword} />
-                    <TouchableOpacity onPress={() => setShowRegPassword(!showRegPassword)} style={styles.eyeBtn}>
-                      <MaterialCommunityIcons name={showRegPassword ? 'eye-off' : 'eye'} size={20} color={COLORS.textMuted} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <TouchableOpacity style={[styles.primaryBtn, {backgroundColor: COLORS.accent}]} onPress={handleRegisterSubmit} disabled={regLoading} activeOpacity={0.8}>
-                  {regLoading ? <ActivityIndicator color="#FFF" /> : <Text style={[styles.primaryBtnText, {color: '#FFF'}]}>{t('login.submitRegister')}</Text>}
-                </TouchableOpacity>
-
-              </View>
-            )}
-
-            <View style={styles.divider}>
-              <View style={styles.line} />
-              <Text style={styles.orText}>OR</Text>
-              <View style={styles.line} />
-            </View>
-
-            <TouchableOpacity style={styles.ssoBtn} onPress={handleGoogleSSO} activeOpacity={0.8}>
-              <MaterialCommunityIcons name="google" size={20} color={COLORS.text} style={{marginRight: 8}} />
-              <Text style={styles.ssoBtnText}>Google</Text>
-            </TouchableOpacity>
-
-          </Animated.View>
+            </Animated.View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </LinearGradient>
   );
 }
 
 const getStyles = (COLORS) => {
   const isDark = COLORS.background === '#0D1117';
+  const borderLineColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+  
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: COLORS.background,
     },
     scrollContent: {
       flexGrow: 1,
-      paddingHorizontal: SPACING.xl,
-      justifyContent: 'center',
-      minHeight: Dimensions.get('window').height,
+      minHeight: height,
     },
-    header: {
+    heroSection: {
       alignItems: 'center',
-      marginBottom: SPACING.xxl,
+      justifyContent: 'center',
+      paddingTop: Platform.OS === 'ios' ? 100 : 80,
+      paddingBottom: 40,
     },
-    iconContainer: {
-      width: 80, height: 80, borderRadius: 40,
-      backgroundColor: isDark ? 'rgba(100, 255, 218, 0.1)' : 'rgba(64, 192, 87, 0.1)',
-      justifyContent: 'center', alignItems: 'center',
-      marginBottom: SPACING.lg,
-      borderWidth: 2,
-      borderColor: COLORS.primary,
-      shadowColor: COLORS.primary, shadowOpacity: isDark ? 0.6 : 0.2, shadowRadius: 15, shadowOffset: { width: 0, height: 0 }
+    heroLogo: {
+      width: 160, 
+      height: 160,
     },
-    title: {
+    heroTitle: {
       fontFamily: TYPOGRAPHY.fontFamily.bold,
-      fontSize: 36,
+      fontSize: 32,
       color: COLORS.text,
-      letterSpacing: 2,
-      textTransform: 'uppercase',
+      letterSpacing: 6,
+      marginTop: SPACING.md,
     },
-    subtitle: {
-      fontFamily: TYPOGRAPHY.fontFamily.regular,
-      fontSize: FONT_SIZE.md,
-      color: COLORS.textSecondary,
-      marginTop: SPACING.xs,
-      letterSpacing: 1,
+    contentWrapper: {
+      flex: 1,
+      paddingHorizontal: SPACING.xl,
+      paddingBottom: SPACING.xxxl,
+      alignItems: 'center',
     },
-    card: {
-      backgroundColor: COLORS.card,
-      borderRadius: BORDER_RADIUS.xl,
-      padding: SPACING.xl,
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(100, 255, 218, 0.3)' : COLORS.border,
-      shadowColor: isDark ? COLORS.primary : '#000',
-      shadowOpacity: isDark ? 0.2 : 0.05,
-      shadowRadius: 20,
-      shadowOffset: { width: 0, height: 10 },
-      elevation: 5,
-    },
-    tabContainer: {
+    modernTabContainer: {
       flexDirection: 'row',
-      backgroundColor: COLORS.background,
-      borderRadius: BORDER_RADIUS.lg,
-      padding: 4,
-      marginBottom: SPACING.xl,
-      borderWidth: 1, borderColor: COLORS.border,
+      justifyContent: 'center',
+      marginBottom: SPACING.xxl,
+      width: '100%',
     },
-    tab: {
-      flex: 1, paddingVertical: SPACING.sm, alignItems: 'center', borderRadius: BORDER_RADIUS.md,
-    },
-    activeTab: {
-      backgroundColor: isDark ? 'rgba(100, 255, 218, 0.15)' : COLORS.card,
-      shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
+    modernTab: {
+      paddingVertical: SPACING.sm,
+      paddingHorizontal: SPACING.xl,
+      position: 'relative',
+      alignItems: 'center',
     },
     tabText: {
       fontFamily: TYPOGRAPHY.fontFamily.bold,
       color: COLORS.textMuted,
-      fontSize: FONT_SIZE.sm,
+      fontSize: FONT_SIZE.md,
       textTransform: 'uppercase',
+      letterSpacing: 2,
     },
     activeTabText: {
       color: COLORS.text,
     },
+    activeIndicator: {
+      position: 'absolute',
+      bottom: 0,
+      width: 24,
+      height: 3,
+      backgroundColor: GREEN_PRIMARY,
+      borderRadius: 1.5,
+    },
+    formContainer: {
+      width: '100%',
+    },
     inputGroup: {
-      marginBottom: SPACING.lg,
+      marginBottom: SPACING.xl,
     },
     label: {
-      fontFamily: TYPOGRAPHY.fontFamily.bold,
-      fontSize: 10,
+      fontFamily: TYPOGRAPHY.fontFamily.regular,
+      fontSize: 12,
       color: COLORS.textSecondary,
       textTransform: 'uppercase',
-      letterSpacing: 1,
+      letterSpacing: 2,
       marginBottom: 8,
     },
     inputWrapper: {
-      flexDirection: 'row', alignItems: 'center',
-      backgroundColor: COLORS.background,
-      borderWidth: 1, borderColor: COLORS.border,
-      borderRadius: BORDER_RADIUS.lg,
-      paddingHorizontal: SPACING.md, height: 56,
-    },
-    inputIcon: {
-      marginRight: SPACING.sm,
+      flexDirection: 'row', 
+      alignItems: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: borderLineColor,
+      height: 48,
     },
     input: {
-      flex: 1, height: '100%',
+      flex: 1, 
+      height: '100%',
       fontFamily: TYPOGRAPHY.fontFamily.regular,
-      fontSize: FONT_SIZE.md, color: COLORS.text,
+      fontSize: FONT_SIZE.lg, 
+      color: COLORS.text,
     },
     eyeBtn: {
-      paddingHorizontal: SPACING.sm,
+      paddingLeft: SPACING.md,
+      paddingVertical: SPACING.sm,
     },
     errorText: {
       fontFamily: TYPOGRAPHY.fontFamily.bold,
-      fontSize: FONT_SIZE.xs, color: COLORS.error,
-      marginBottom: SPACING.md, textAlign: 'center',
+      fontSize: FONT_SIZE.xs, 
+      color: COLORS.error,
+      marginBottom: SPACING.md, 
+      textAlign: 'center',
     },
     primaryBtn: {
-      backgroundColor: COLORS.primary,
-      height: 56, borderRadius: BORDER_RADIUS.lg,
-      justifyContent: 'center', alignItems: 'center',
-      marginTop: SPACING.md,
+      backgroundColor: GREEN_PRIMARY,
+      height: 60, 
+      borderRadius: BORDER_RADIUS.full,
+      justifyContent: 'center', 
+      alignItems: 'center',
+      marginTop: SPACING.xl,
+      shadowColor: GREEN_DARK,
+      shadowOpacity: 0.4,
+      shadowRadius: 15,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 8,
+      width: '100%',
     },
     primaryBtnText: {
       fontFamily: TYPOGRAPHY.fontFamily.bold,
-      fontSize: FONT_SIZE.md, color: isDark ? '#0D1117' : '#FFF',
-      textTransform: 'uppercase', letterSpacing: 1,
+      fontSize: FONT_SIZE.md, 
+      color: '#FFFFFF',
+      textTransform: 'uppercase', 
+      letterSpacing: 3,
     },
     divider: {
-      flexDirection: 'row', alignItems: 'center',
-      marginVertical: SPACING.xl,
+      flexDirection: 'row', 
+      alignItems: 'center',
+      marginVertical: SPACING.xxl,
+      width: '100%',
     },
     line: {
-      flex: 1, height: 1, backgroundColor: COLORS.border,
+      flex: 1, 
+      height: 1, 
+      backgroundColor: borderLineColor,
     },
     orText: {
-      fontFamily: TYPOGRAPHY.fontFamily.bold,
-      fontSize: 10, color: COLORS.textMuted,
-      marginHorizontal: SPACING.md,
+      fontFamily: TYPOGRAPHY.fontFamily.regular,
+      fontSize: 12, 
+      color: COLORS.textMuted,
+      marginHorizontal: SPACING.lg,
+      textTransform: 'uppercase',
+      letterSpacing: 2,
     },
     ssoBtn: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-      backgroundColor: COLORS.background,
-      borderWidth: 1, borderColor: COLORS.border,
-      height: 56, borderRadius: BORDER_RADIUS.lg,
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+      borderWidth: 1, 
+      borderColor: borderLineColor,
+      height: 60, 
+      borderRadius: BORDER_RADIUS.full,
+      width: '100%',
+    },
+    googleIcon: {
+      width: 24, 
+      height: 24, 
+      marginRight: 12,
     },
     ssoBtnText: {
       fontFamily: TYPOGRAPHY.fontFamily.bold,
-      fontSize: FONT_SIZE.sm, color: COLORS.text,
+      fontSize: FONT_SIZE.md, 
+      color: COLORS.text,
+    },
+    avatarPickerContainer: {
+      alignItems: 'center', 
+      marginBottom: SPACING.xxl,
+    },
+    avatarPickerBtn: {
+      width: 100, 
+      height: 100, 
+      borderRadius: 50,
+      backgroundColor: 'transparent',
+      borderWidth: 1, 
+      borderColor: GREEN_PRIMARY,
+      borderStyle: 'dashed',
+      justifyContent: 'center', 
+      alignItems: 'center',
+      overflow: 'hidden',
+    },
+    avatarImage: {
+      width: '100%', 
+      height: '100%',
     },
   });
 };
