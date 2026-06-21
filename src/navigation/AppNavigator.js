@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, ActivityIndicator, StyleSheet, AppState } from 'react-native';
 import { NavigationContainer, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -38,6 +38,26 @@ export default function AppNavigator() {
     },
   };
 
+  // AppState (Foreground/Background) dinleyicisi
+  const appState = useRef(AppState.currentState);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        // Uygulama arka plandan geri döndü, gece 00:00 geçmiş olabilir mi diye kontrol et!
+        useUserStore.getState().checkDailyReset();
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   // İlk yükleme — splash/loading ekranı
   if (loading) {
     return <SplashScreen />;
@@ -48,7 +68,7 @@ export default function AppNavigator() {
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
-          animation: 'slide_from_right',
+          animation: 'fade',
           contentStyle: { backgroundColor: COLORS_THEME.background },
         }}
       >

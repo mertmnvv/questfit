@@ -1,10 +1,9 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Platform, TextInput } from 'react-native';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Platform, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
+import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -14,18 +13,105 @@ import { SPACING, FONT_SIZE, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../theme
 import HorizontalSlider from '../components/HorizontalSlider';
 
 const { width } = Dimensions.get('window');
-const chartWidth = width - SPACING.lg * 2;
+
+// Helper to format date strings
+const getDayName = (dateStr, lang) => {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString(lang, { weekday: 'short' });
+};
+const getDayNumber = (dateStr) => {
+  return new Date(dateStr).getDate();
+};
+
+// --- Micro-animated Solid Card Component ---
+const SolidCard = ({ children, style, delay = 0, variant = 'default' }) => {
+  const fadeAnim = useState(new Animated.Value(0))[0];
+  const slideAnim = useState(new Animated.Value(20))[0];
+  const COLORS_THEME = useThemeColors();
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        delay,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 40,
+        delay,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const bgColors = {
+    default: COLORS_THEME.card,
+    danger: '#FF6B6B',
+    success: '#40C057',
+    primary: '#845EF7'
+  };
+
+  return (
+    <Animated.View style={[
+      styles.solidContainer, 
+      style, 
+      { backgroundColor: bgColors[variant] || COLORS_THEME.card },
+      { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+    ]}>
+      {children}
+    </Animated.View>
+  );
+};
 
 export default function StatsScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigation = useNavigation();
   const COLORS_THEME = useThemeColors();
-  const styles = useMemo(() => getStyles(COLORS_THEME), [COLORS_THEME]);
-
-  const { weightHistory, calorieHistory, stepHistory, consumedToday, profile, updateWeight, updateStepHistory } = useUserStore();
-
-  const [timeRange, setTimeRange] = useState('7d'); // '7d' or '30d'
+  
+  const { profile, streak, stepStreak, consumedToday, stepHistory, calorieHistory, updateWeight, updateStepHistory } = useUserStore();
   const [weightInput, setWeightInput] = useState(profile?.weight?.toString() || '75');
+
+  // Time calculations
+  const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+  const todayStr = new Date(Date.now() - tzOffset).toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+
+  const scrollRef = useRef(null);
+
+  // Generate last 14 days
+  const last14Days = useMemo(() => {
+    const days = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(Date.now() - tzOffset - i * 24 * 60 * 60 * 1000);
+      days.push(d.toISOString().split('T')[0]);
+    }
+    return days;
+  }, [tzOffset]);
+
+  // Load steps on focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadSteps = async () => {
+        const history = await fetchStepHistory(14);
+        if (history && history.length > 0) {
+          updateStepHistory(history);
+        }
+      };
+      loadSteps();
+    }, [])
+  );
+
+  // Auto-scroll to the end of the calendar (today) when mounted
+  useEffect(() => {
+    setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollToEnd({ animated: true });
+      }
+    }, 100);
+  }, []);
 
   const handleSaveWeight = () => {
     const newWeight = parseFloat(weightInput.replace(',', '.')) || parseFloat(profile?.weight);
@@ -33,302 +119,227 @@ export default function StatsScreen() {
       updateWeight(newWeight);
       Toast.show({
         type: 'success',
-        text1: t('common.success'),
-        text2: t('toasts.weightUpdated'),
+        text1: t('common.success') || 'Başarılı',
+        text2: t('toasts.weightUpdated') || 'Kilo güncellendi.',
         position: 'top',
         topOffset: 60,
       });
     }
   };
 
-  useEffect(() => {
-    const loadSteps = async () => {
-      const days = timeRange === '7d' ? 7 : 30;
-      const history = await fetchStepHistory(days);
-      if (history && history.length > 0) {
-        updateStepHistory(history);
-      }
-    };
-    loadSteps();
-  }, [timeRange]);
+  const isToday = selectedDate === todayStr;
 
-  // --- Weight Data ---
-  const weightDataPoints = useMemo(() => {
-    let history = weightHistory || [];
-    const days = timeRange === '7d' ? 7 : 30;
-    history = history.slice(-days);
-    
-    if (history.length < 2) return null;
+  // --- Get Data for Selected Date ---
+  const selectedStepData = useMemo(() => {
+    if (isToday && stepHistory && stepHistory.length > 0) {
+       // Get newest
+       return stepHistory.find(s => s.date === todayStr)?.steps || 0;
+    }
+    const record = stepHistory?.find(s => s.date === selectedDate);
+    return record ? record.steps : 0;
+  }, [selectedDate, stepHistory, isToday, todayStr]);
 
-    const labels = history.map(d => {
-      const date = new Date(d.date);
-      return `${date.getDate()}/${date.getMonth() + 1}`;
-    });
-    const data = history.map(d => parseFloat(d.weight));
+  const selectedCalorieData = useMemo(() => {
+    if (isToday) {
+      return {
+        calories: consumedToday?.calories || 0,
+        protein: consumedToday?.protein || 0,
+        carbs: consumedToday?.carbs || 0,
+        fat: consumedToday?.fat || 0,
+        burnedCalories: consumedToday?.burnedCalories || 0,
+      };
+    }
+    const record = calorieHistory?.find(c => c.date === selectedDate);
+    return record || { calories: 0, protein: 0, carbs: 0, fat: 0, burnedCalories: 0 };
+  }, [selectedDate, calorieHistory, isToday, consumedToday]);
 
-    return { labels, data };
-  }, [weightHistory, timeRange]);
+  const dailyStepTarget = profile?.stepTarget || 10000;
+  const caloriesTarget = profile?.tdee || 2000;
 
-  // --- Calories Data (Bar Chart) ---
-  const calorieDataPoints = useMemo(() => {
-    let history = calorieHistory || [];
-    const days = timeRange === '7d' ? 7 : 30;
-    
-    history = history.slice(-days);
-
-    if (history.length === 0) return null;
-
-    const displayHistory = timeRange === '7d' ? history : history.slice(-7);
-
-    const labels = displayHistory.map(d => {
-      const date = new Date(d.date);
-      return `${date.getDate()}/${date.getMonth() + 1}`;
-    });
-    const data = displayHistory.map(d => d.calories || 0);
-
-    return { labels, data };
-  }, [calorieHistory, timeRange]);
-
-  // --- Step Data (Bar Chart) ---
-  const stepDataPoints = useMemo(() => {
-    let history = stepHistory || [];
-    const days = timeRange === '7d' ? 7 : 30;
-    
-    const displayHistory = history.slice(-days);
-
-    if (displayHistory.length === 0) return null;
-
-    const labels = displayHistory.map(d => {
-      const date = new Date(d.date);
-      return `${date.getDate()}/${date.getMonth() + 1}`;
-    });
-    const data = displayHistory.map(d => d.steps || 0);
-
-    return { labels, data };
-  }, [stepHistory, timeRange]);
-
-  // --- Macros Data (Pie Chart) ---
-  const macroDataPoints = useMemo(() => {
-    const p = consumedToday?.protein || 0;
-    const c = consumedToday?.carbs || 0;
-    const f = consumedToday?.fat || 0;
-
-    if (p === 0 && c === 0 && f === 0) return null;
-
-    return [
-      {
-        name: t('common.back') === 'Geri' ? ' Protein' : ' Protein',
-        amount: Math.round(p),
-        color: '#FF6B6B',
-        legendFontColor: COLORS_THEME.text,
-        legendFontSize: 12
-      },
-      {
-        name: t('common.back') === 'Geri' ? ' Karb' : ' Carbs',
-        amount: Math.round(c),
-        color: '#4DABF7',
-        legendFontColor: COLORS_THEME.text,
-        legendFontSize: 12
-      },
-      {
-        name: t('common.back') === 'Geri' ? ' Yağ' : ' Fat',
-        amount: Math.round(f),
-        color: '#FCC419',
-        legendFontColor: COLORS_THEME.text,
-        legendFontSize: 12
-      }
-    ];
-  }, [consumedToday, COLORS_THEME, t]);
-
-  const chartConfig = {
-    backgroundColor: 'transparent',
-    backgroundGradientFromOpacity: 0,
-    backgroundGradientToOpacity: 0,
-    decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(64, 192, 87, ${opacity})`,
-    labelColor: (opacity = 1) => COLORS_THEME.textSecondary,
-    style: { borderRadius: BORDER_RADIUS.md },
-    propsForDots: { r: '4', strokeWidth: '2', stroke: COLORS_THEME.primary },
-    propsForBackgroundLines: { stroke: 'rgba(255,255,255,0.05)' },
-  };
+  const stepProgress = Math.min(100, (selectedStepData / dailyStepTarget) * 100);
+  const calProgress = Math.min(100, (selectedCalorieData.calories / caloriesTarget) * 100);
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={[COLORS_THEME.background, COLORS_THEME.card, COLORS_THEME.background]} style={styles.gradient}>
+    <View style={[styles.container, { backgroundColor: COLORS_THEME.background }]}>
+      <View style={[styles.gradient, { backgroundColor: COLORS_THEME.background }]}>
         
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: COLORS_THEME.border }]}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS_THEME.text} />
           </TouchableOpacity>
           <View style={{flex: 1}}>
-            <Text style={styles.headerTitle}>{t('common.back') === 'Geri' ? 'İstatistikler' : 'Statistics'}</Text>
+            <Text style={[styles.headerTitle, { color: COLORS_THEME.text }]}>{t('common.back') === 'Geri' ? 'Günlük Kayıtlar' : 'Daily Logs'}</Text>
           </View>
+        </View>
+
+        {/* CALENDAR STRIP */}
+        <View style={styles.calendarWrapper}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.calendarScroll}
+            ref={scrollRef}
+          >
+            {last14Days.map((dateStr) => {
+              const selected = dateStr === selectedDate;
+              return (
+                <TouchableOpacity 
+                  key={dateStr} 
+                  activeOpacity={0.7}
+                  onPress={() => setSelectedDate(dateStr)}
+                  style={[
+                    styles.dateNode, 
+                    selected && { backgroundColor: COLORS_THEME.primary + '33', borderColor: COLORS_THEME.primary }
+                  ]}
+                >
+                  <Text style={[styles.dayNameText, { color: selected ? COLORS_THEME.primary : COLORS_THEME.textSecondary }]}>
+                    {getDayName(dateStr, i18n.language)}
+                  </Text>
+                  <Text style={[styles.dayNumberText, { color: selected ? COLORS_THEME.text : COLORS_THEME.textSecondary }]}>
+                    {getDayNumber(dateStr)}
+                  </Text>
+                  {dateStr === todayStr && (
+                    <View style={[styles.todayIndicator, { backgroundColor: COLORS_THEME.primary }]} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
-          {/* Top Hero Card: Weight Entry Panel */}
-          <LinearGradient colors={['rgba(64,192,87,0.15)', 'rgba(64,192,87,0.02)']} style={styles.heroCard}>
-            <View style={styles.heroHeader}>
-              <View style={[styles.heroIconBox, { backgroundColor: 'rgba(64,192,87,0.2)' }]}>
-                <MaterialCommunityIcons name="scale-bathroom" size={24} color={COLORS_THEME.primary} />
+          {isToday && (
+            <>
+              {/* STREAK SHOWCASE (Top 2 Cards) */}
+              <View style={styles.streakGrid}>
+                <SolidCard style={styles.streakCard} variant="danger" delay={100}>
+                  <View style={styles.streakIconBoxWhite}>
+                    <FontAwesome5 name="fire-alt" size={28} color="#FF6B6B" />
+                  </View>
+                  <Text style={[styles.streakNumber, { color: '#FFF' }]}>{streak}</Text>
+                  <Text style={[styles.streakLabel, { color: '#FFF' }]}>{t('common.back') === 'Geri' ? 'Giriş Serisi' : 'Login Streak'}</Text>
+                </SolidCard>
+
+                <SolidCard style={styles.streakCard} variant="success" delay={200}>
+                  <View style={styles.streakIconBoxWhite}>
+                    <MaterialCommunityIcons name="shoe-print" size={28} color="#40C057" />
+                  </View>
+                  <Text style={[styles.streakNumber, { color: '#FFF' }]}>{stepStreak}</Text>
+                  <Text style={[styles.streakLabel, { color: '#FFF' }]}>{t('common.back') === 'Geri' ? 'Adım Serisi' : 'Step Streak'}</Text>
+                </SolidCard>
               </View>
-              <View style={{ marginLeft: SPACING.sm }}>
-                <Text style={styles.heroTitle}>{t('common.back') === 'Geri' ? 'Bugünün Kilosu' : "Today's Weight"}</Text>
-                <Text style={styles.heroSubtitle}>{t('common.back') === 'Geri' ? 'Hedefine ne kadar yakınsın?' : 'How close are you to your goal?'}</Text>
-              </View>
-            </View>
 
-            <View style={{ alignItems: 'center', marginTop: SPACING.md }}>
-              <HorizontalSlider
-                value={parseFloat(weightInput.replace(',', '.')) || parseFloat(profile?.weight) || 75}
-                min={30} max={200} step={0.1}
-                onChange={(val) => setWeightInput(val.toString())}
-                color={COLORS_THEME.primary}
-                unit="kg"
-              />
-              
-              <TouchableOpacity style={[styles.heroSaveBtn, { width: '100%', alignItems: 'center', marginTop: SPACING.lg }]} onPress={handleSaveWeight} activeOpacity={0.8}>
-                <Text style={styles.heroSaveBtnText}>{t('common.save')}</Text>
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
+              {/* WEIGHT PANEL */}
+              <Text style={[styles.sectionTitle, { color: COLORS_THEME.text, marginTop: SPACING.sm }]}>{t('common.back') === 'Geri' ? 'Fiziksel Durum' : 'Physical Form'}</Text>
 
-          {/* Time Range Pills */}
-          <View style={styles.tabContainer}>
-            <TouchableOpacity 
-              style={[styles.tab, timeRange === '7d' && styles.tabActive]}
-              onPress={() => setTimeRange('7d')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tabText, timeRange === '7d' && styles.tabTextActive]}>
-                {t('common.back') === 'Geri' ? 'Son 7 Gün' : 'Last 7 Days'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.tab, timeRange === '30d' && styles.tabActive]}
-              onPress={() => setTimeRange('30d')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tabText, timeRange === '30d' && styles.tabTextActive]}>
-                {t('common.back') === 'Geri' ? 'Son 30 Gün' : 'Last 30 Days'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+              <SolidCard style={styles.weightCard} variant="default" delay={300}>
+                <View style={styles.heroHeader}>
+                  <View style={[styles.heroIconBox, { backgroundColor: '#845EF7' }]}>
+                    <MaterialCommunityIcons name="scale-bathroom" size={24} color="#FFF" />
+                  </View>
+                  <View style={{ marginLeft: SPACING.sm }}>
+                    <Text style={[styles.heroTitle, { color: COLORS_THEME.text }]}>{t('common.back') === 'Geri' ? 'Kilo Güncelle' : "Update Weight"}</Text>
+                  </View>
+                </View>
 
-          {/* Chart 1: Weight Chart */}
-          <View style={styles.chartCard}>
-            <View style={styles.chartHeader}>
-              <MaterialCommunityIcons name="chart-bell-curve" size={20} color={COLORS_THEME.primary} />
-              <Text style={styles.chartTitle}>{t('common.back') === 'Geri' ? 'Kilo Değişimi' : 'Weight Trend'}</Text>
-            </View>
+                <View style={{ alignItems: 'center', marginTop: SPACING.md }}>
+                  <HorizontalSlider
+                    value={parseFloat(weightInput.replace(',', '.')) || parseFloat(profile?.weight) || 75}
+                    min={30} max={200} step={0.1}
+                    onChange={(val) => setWeightInput(val.toString())}
+                    color="#845EF7"
+                    unit="kg"
+                  />
+                  
+                  <TouchableOpacity style={[styles.heroSaveBtn, { backgroundColor: '#845EF7' }]} onPress={handleSaveWeight} activeOpacity={0.8}>
+                    <Text style={styles.heroSaveBtnText}>{t('common.save')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </SolidCard>
+            </>
+          )}
+
+          {/* TIMELINE LIST FOR SELECTED DATE */}
+          <Text style={[styles.sectionTitle, { color: COLORS_THEME.text, marginTop: SPACING.md }]}>
+            {isToday ? (t('common.back') === 'Geri' ? "Bugünün Özeti" : "Today's Summary") : getDayNumber(selectedDate) + " " + getDayName(selectedDate, i18n.language) + " Özeti"}
+          </Text>
+
+          <SolidCard style={styles.timelineCard} variant="default" delay={400}>
             
-            {weightDataPoints ? (
-              <View style={styles.chartWrapper}>
-                <LineChart
-                  data={{ labels: weightDataPoints.labels, datasets: [{ data: weightDataPoints.data }] }}
-                  width={chartWidth - SPACING.lg * 2 + 16}
-                  height={220}
-                  yAxisSuffix="kg"
-                  chartConfig={chartConfig}
-                  bezier
-                  style={styles.chartStyle}
-                />
+            {/* Steps Timeline Item */}
+            <View style={styles.timelineItem}>
+              <View style={[styles.timelineIconContainer, { backgroundColor: '#4DABF7' }]}>
+                <MaterialCommunityIcons name="run" size={22} color="#FFF" />
               </View>
-            ) : (
-              <View style={styles.emptyChart}>
-                <Text style={styles.emptyText}>{t('common.back') === 'Geri' ? 'Yeterli kilo verisi yok.' : 'Not enough weight data.'}</Text>
+              <View style={styles.timelineContent}>
+                <Text style={[styles.timelineTitle, { color: COLORS_THEME.text }]}>{t('common.back') === 'Geri' ? 'Adım Geçmişi' : 'Step History'}</Text>
+                <Text style={[styles.timelineData, { color: COLORS_THEME.textSecondary }]}>
+                  {selectedStepData} <Text style={{fontSize: 12}}> / {dailyStepTarget}</Text>
+                </Text>
+                <View style={styles.progressBarBg}>
+                  <View style={[styles.progressBarFill, { width: `${stepProgress}%`, backgroundColor: '#4DABF7' }]} />
+                </View>
               </View>
-            )}
-          </View>
-
-          {/* Chart 2: Calories Chart */}
-          <View style={styles.chartCard}>
-            <View style={styles.chartHeader}>
-              <MaterialCommunityIcons name="fire" size={20} color="#4DABF7" />
-              <Text style={styles.chartTitle}>{t('common.back') === 'Geri' ? 'Alınan Kaloriler' : 'Consumed Calories'}</Text>
             </View>
 
-            {calorieDataPoints ? (
-              <View style={styles.chartWrapper}>
-                <BarChart
-                  data={{ labels: calorieDataPoints.labels, datasets: [{ data: calorieDataPoints.data }] }}
-                  width={chartWidth - SPACING.lg * 2 + 16}
-                  height={220}
-                  yAxisSuffix=""
-                  chartConfig={{ ...chartConfig, color: (opacity = 1) => `rgba(77, 171, 247, ${opacity})` }}
-                  style={styles.chartStyle}
-                />
+            {/* Nutrition Timeline Item */}
+            <View style={styles.timelineItem}>
+              <View style={[styles.timelineIconContainer, { backgroundColor: '#FCC419' }]}>
+                <MaterialCommunityIcons name="food-apple" size={22} color="#FFF" />
               </View>
-            ) : (
-              <View style={styles.emptyChart}>
-                <Text style={styles.emptyText}>{t('common.back') === 'Geri' ? 'Geçmiş kalori verisi bulunamadı.' : 'No calorie history found.'}</Text>
-              </View>
-            )}
-          </View>
+              <View style={styles.timelineContent}>
+                <Text style={[styles.timelineTitle, { color: COLORS_THEME.text }]}>{t('common.back') === 'Geri' ? 'Beslenme Özeti' : 'Nutrition'}</Text>
+                <Text style={[styles.timelineData, { color: COLORS_THEME.textSecondary }]}>
+                  {Math.round(selectedCalorieData.calories)} <Text style={{fontSize: 12}}> / {Math.round(caloriesTarget)} kcal</Text>
+                </Text>
+                <View style={styles.progressBarBg}>
+                  <View style={[styles.progressBarFill, { width: `${calProgress}%`, backgroundColor: '#FCC419' }]} />
+                </View>
 
-          {/* Chart 3: Step Chart */}
-          <View style={styles.chartCard}>
-            <View style={styles.chartHeader}>
-              <MaterialCommunityIcons name="shoe-print" size={20} color="#FF922B" />
-              <Text style={styles.chartTitle}>{t('common.back') === 'Geri' ? 'Adım Geçmişi' : 'Step History'}</Text>
+                {/* Macros */}
+                <View style={styles.macroRow}>
+                  <View style={styles.macroBox}>
+                    <Text style={[styles.macroLabel, { color: '#FF6B6B' }]}>Protein</Text>
+                    <Text style={[styles.macroVal, { color: COLORS_THEME.text }]}>{Math.round(selectedCalorieData.protein)}g</Text>
+                  </View>
+                  <View style={styles.macroBox}>
+                    <Text style={[styles.macroLabel, { color: '#339AF0' }]}>Karb</Text>
+                    <Text style={[styles.macroVal, { color: COLORS_THEME.text }]}>{Math.round(selectedCalorieData.carbs)}g</Text>
+                  </View>
+                  <View style={styles.macroBox}>
+                    <Text style={[styles.macroLabel, { color: '#FCC419' }]}>Yağ</Text>
+                    <Text style={[styles.macroVal, { color: COLORS_THEME.text }]}>{Math.round(selectedCalorieData.fat)}g</Text>
+                  </View>
+                </View>
+              </View>
             </View>
 
-            {stepDataPoints ? (
-              <View style={styles.chartWrapper}>
-                <BarChart
-                  data={{ labels: stepDataPoints.labels, datasets: [{ data: stepDataPoints.data }] }}
-                  width={chartWidth - SPACING.lg * 2 + 16}
-                  height={220}
-                  yAxisSuffix=""
-                  chartConfig={{ ...chartConfig, color: (opacity = 1) => `rgba(255, 146, 43, ${opacity})` }}
-                  style={styles.chartStyle}
-                />
+            {/* Workout / Burned Calories Timeline Item */}
+            <View style={[styles.timelineItem, { borderLeftColor: 'transparent', paddingBottom: 0 }]}>
+              <View style={[styles.timelineIconContainer, { backgroundColor: '#FF6B6B' }]}>
+                <MaterialCommunityIcons name="fire" size={22} color="#FFF" />
               </View>
-            ) : (
-              <View style={styles.emptyChart}>
-                <Text style={styles.emptyText}>{t('common.back') === 'Geri' ? 'Geçmiş adım verisi bulunamadı.' : 'No step history found.'}</Text>
+              <View style={styles.timelineContent}>
+                <Text style={[styles.timelineTitle, { color: COLORS_THEME.text }]}>{t('common.back') === 'Geri' ? 'Aktif Yakım' : 'Active Burn'}</Text>
+                <Text style={[styles.timelineData, { color: '#FF6B6B', fontSize: 20 }]}>
+                  {Math.round(selectedCalorieData.burnedCalories)} <Text style={{fontSize: 14, color: COLORS_THEME.textSecondary}}>kcal</Text>
+                </Text>
               </View>
-            )}
-          </View>
-
-          {/* Chart 4: Macros Pie Chart */}
-          <View style={styles.chartCard}>
-            <View style={styles.chartHeader}>
-              <MaterialCommunityIcons name="chart-pie" size={20} color="#FCC419" />
-              <Text style={styles.chartTitle}>{t('common.back') === 'Geri' ? 'Bugünkü Makro Dağılımı' : "Today's Macro Split"}</Text>
             </View>
 
-            {macroDataPoints ? (
-              <View style={styles.chartWrapper}>
-                <PieChart
-                  data={macroDataPoints}
-                  width={chartWidth - SPACING.lg * 2 + 16}
-                  height={200}
-                  chartConfig={chartConfig}
-                  accessor={"amount"}
-                  backgroundColor={"transparent"}
-                  paddingLeft={"15"}
-                  absolute
-                />
-              </View>
-            ) : (
-              <View style={styles.emptyChart}>
-                <Text style={styles.emptyText}>{t('common.back') === 'Geri' ? 'Bugün henüz öğün eklenmedi.' : 'No meals added today.'}</Text>
-              </View>
-            )}
-          </View>
+          </SolidCard>
 
           <View style={{height: 100}} />
         </ScrollView>
-      </LinearGradient>
+      </View>
     </View>
   );
 }
 
-const getStyles = (COLORS_THEME) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS_THEME.background },
+const styles = StyleSheet.create({
+  container: { flex: 1 },
   gradient: { flex: 1 },
   header: {
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
@@ -336,129 +347,192 @@ const getStyles = (COLORS_THEME) => StyleSheet.create({
     paddingBottom: SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS_THEME.border,
   },
   backBtn: { padding: SPACING.xs, marginRight: SPACING.md },
-  headerTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.xl, color: COLORS_THEME.text },
+  headerTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.xl },
   
-  scrollContent: { padding: SPACING.lg },
-  
-  // Hero Card (Weight Entry)
-  heroCard: {
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
+  // Calendar Strip
+  calendarWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+    paddingBottom: SPACING.sm,
+  },
+  calendarScroll: {
+    paddingHorizontal: SPACING.lg,
+    alignItems: 'center',
+  },
+  dateNode: {
+    width: 50,
+    height: 65,
+    borderRadius: BORDER_RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.sm,
     borderWidth: 1,
-    borderColor: COLORS_THEME.border,
-    marginBottom: SPACING.xl,
+    borderColor: 'transparent',
+  },
+  dayNameText: {
+    fontFamily: TYPOGRAPHY.fontFamily.medium,
+    fontSize: 11,
+    textTransform: 'uppercase',
+  },
+  dayNumberText: {
+    fontFamily: TYPOGRAPHY.fontFamily.bold,
+    fontSize: 18,
+    marginTop: 2,
+  },
+  todayIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    position: 'absolute',
+    bottom: 6,
+  },
+
+  scrollContent: { padding: SPACING.lg },
+  sectionTitle: {
+    fontFamily: TYPOGRAPHY.fontFamily.bold,
+    fontSize: FONT_SIZE.lg,
+    marginBottom: SPACING.md,
+  },
+
+  // Solid System
+  solidContainer: {
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
     ...SHADOWS.card,
+  },
+
+  // Streak Grid
+  streakGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.xl,
+  },
+  streakCard: {
+    width: (width - SPACING.lg * 2 - SPACING.md) / 2,
+    alignItems: 'center',
+    paddingVertical: SPACING.xl,
+    borderRadius: BORDER_RADIUS.xl,
+  },
+  streakIconBoxWhite: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  streakNumber: {
+    fontFamily: TYPOGRAPHY.fontFamily.black,
+    fontSize: 32,
+  },
+  streakLabel: {
+    fontFamily: TYPOGRAPHY.fontFamily.medium,
+    fontSize: FONT_SIZE.xs,
+    marginTop: 4,
+  },
+
+  // Weight Card
+  weightCard: {
+    marginBottom: SPACING.xl,
   },
   heroHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.lg,
   },
   heroIconBox: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: BORDER_RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
   heroTitle: {
     fontFamily: TYPOGRAPHY.fontFamily.bold,
-    fontSize: FONT_SIZE.lg,
-    color: COLORS_THEME.text,
-  },
-  heroSubtitle: {
-    fontFamily: TYPOGRAPHY.fontFamily.regular,
-    fontSize: FONT_SIZE.sm,
-    color: COLORS_THEME.textSecondary,
-    marginTop: 2,
-  },
-  heroInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS_THEME.background,
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  heroInput: {
-    flex: 1,
-    fontFamily: TYPOGRAPHY.fontFamily.bold,
-    fontSize: FONT_SIZE.xxl,
-    color: COLORS_THEME.text,
-    padding: 0,
-  },
-  heroInputUnit: {
-    fontFamily: TYPOGRAPHY.fontFamily.regular,
     fontSize: FONT_SIZE.md,
-    color: COLORS_THEME.textSecondary,
-    marginRight: SPACING.md,
   },
   heroSaveBtn: {
-    backgroundColor: COLORS_THEME.primary,
+    width: '100%', 
+    alignItems: 'center', 
+    marginTop: SPACING.lg,
     paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
+    paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.md,
-    ...SHADOWS.glow,
   },
   heroSaveBtnText: {
     fontFamily: TYPOGRAPHY.fontFamily.bold,
-    color: '#0D1117',
+    color: '#FFF',
     fontSize: FONT_SIZE.md,
   },
 
-  // Pill Tabs
-  tabContainer: {
+  // Timeline List
+  timelineCard: {
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+  },
+  timelineItem: {
     flexDirection: 'row',
-    backgroundColor: COLORS_THEME.card,
+    paddingBottom: SPACING.xl,
+    borderLeftWidth: 2,
+    borderLeftColor: 'rgba(255,255,255,0.1)',
+    marginLeft: 20,
+    paddingLeft: 20,
+  },
+  timelineIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    left: -21, // Center over border
+    top: 0,
+  },
+  timelineContent: {
+    flex: 1,
+    marginTop: -4,
+  },
+  timelineTitle: {
+    fontFamily: TYPOGRAPHY.fontFamily.bold,
+    fontSize: FONT_SIZE.md,
+  },
+  timelineData: {
+    fontFamily: TYPOGRAPHY.fontFamily.black,
+    fontSize: 24,
+    marginTop: 2,
+  },
+  progressBarBg: {
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: BORDER_RADIUS.full,
-    padding: 4,
-    marginBottom: SPACING.xl,
-    borderWidth: 1,
-    borderColor: COLORS_THEME.border,
+    marginTop: SPACING.sm,
+    overflow: 'hidden',
   },
-  tab: { 
-    flex: 1, 
-    paddingVertical: SPACING.sm, 
-    alignItems: 'center', 
-    borderRadius: BORDER_RADIUS.full 
+  progressBarFill: {
+    height: '100%',
+    borderRadius: BORDER_RADIUS.full,
   },
-  tabActive: { backgroundColor: COLORS_THEME.primary },
-  tabText: { fontFamily: TYPOGRAPHY.fontFamily.bold, color: COLORS_THEME.textSecondary, fontSize: FONT_SIZE.sm },
-  tabTextActive: { color: '#0D1117' },
-
-  // Chart Cards
-  chartCard: {
-    backgroundColor: COLORS_THEME.card,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    marginBottom: SPACING.xl,
-    borderWidth: 1,
-    borderColor: COLORS_THEME.border,
-    ...SHADOWS.card,
-  },
-  chartHeader: {
+  macroRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: SPACING.md,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  macroBox: {
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    flex: 1,
   },
-  chartTitle: { 
-    fontFamily: TYPOGRAPHY.fontFamily.bold, 
-    fontSize: FONT_SIZE.md, 
-    color: COLORS_THEME.text,
-    marginLeft: SPACING.sm,
+  macroLabel: {
+    fontFamily: TYPOGRAPHY.fontFamily.medium,
+    fontSize: 11,
   },
-  chartWrapper: {
-    alignItems: 'center',
-    marginLeft: -10, // Adjust for internal chart kit paddings
+  macroVal: {
+    fontFamily: TYPOGRAPHY.fontFamily.bold,
+    fontSize: FONT_SIZE.md,
+    marginTop: 2,
   },
-  chartStyle: { borderRadius: BORDER_RADIUS.md },
-  
-  emptyChart: { height: 150, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: BORDER_RADIUS.md },
-  emptyText: { fontFamily: TYPOGRAPHY.fontFamily.regular, color: COLORS_THEME.textSecondary, fontSize: FONT_SIZE.sm },
 });

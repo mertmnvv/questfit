@@ -51,9 +51,38 @@ export const syncHealthDataToStore = async () => {
       });
     }
 
-    const history = await fetchStepHistory(7);
+    const history = await fetchStepHistory(14); // Use 14 days to calculate longer streaks
     if (history && history.length > 0) {
       updateStepHistory(history);
+      
+      // Calculate Step Streak
+      const { profile, setStepStreak } = useUserStore.getState();
+      const target = profile?.stepTarget || 10000;
+      
+      let currentStreak = 0;
+      const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+      const localISOTime = new Date(Date.now() - tzOffset).toISOString().slice(0, -1);
+      const today = localISOTime.split('T')[0];
+      
+      const reversedHistory = [...history].reverse(); // Newest to oldest
+      
+      for (const item of reversedHistory) {
+         if (item.date === today) {
+             if (item.steps >= target) {
+                 currentStreak++;
+             }
+             // Don't break streak if today is not hit yet, as the day is not over.
+             continue;
+         }
+         
+         if (item.steps >= target) {
+             currentStreak++;
+         } else {
+             break; // Streak broken on this past day
+         }
+      }
+      
+      setStepStreak(currentStreak);
     }
   }
 };

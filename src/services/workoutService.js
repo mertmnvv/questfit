@@ -67,7 +67,8 @@ Format şu şekilde bir DİZİ olmalı (eğer belirsizse 1-2 varyasyon ekle):
     if (data.error) throw new Error(data.error.message);
 
     const textResponse = data.choices[0].message.content;
-    const cleanJsonString = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    const jsonMatch = textResponse.match(/\[[\s\S]*\]/);
+    const cleanJsonString = jsonMatch ? jsonMatch[0] : textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
     
     let parsedArray = [];
     try {
@@ -103,6 +104,15 @@ Format şu şekilde bir DİZİ olmalı (eğer belirsizse 1-2 varyasyon ekle):
 
   } catch (error) {
     console.error('Antrenman Arama Hatası:', error);
-    throw error;
+    // Return mock fallback instead of throwing to prevent crashes
+    return [{
+      id: `mock_workout_${Date.now()}`,
+      name: 'Yürüyüş (Yapay Zeka Hatası)',
+      type: 'Egzersiz',
+      description: '30 Dk | Hafif Tempo | 150 kcal',
+      burnedCalories: 150,
+      durationMin: 30,
+      referenceWeight: weightKg,
+    }];
   }
 };

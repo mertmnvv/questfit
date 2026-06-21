@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useNavigation } from '@react-navigation/native';
 import { useUserStore } from '../store/userStore';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { SPACING, FONT_SIZE, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../theme';
@@ -19,6 +20,7 @@ const { width, height } = Dimensions.get('window');
 
 export default function TutorialModal() {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const COLORS = useThemeColors();
   const styles = useMemo(() => getStyles(COLORS), [COLORS]);
 
@@ -60,31 +62,48 @@ export default function TutorialModal() {
       title: t('tutorial.step1Title'),
       desc: t('tutorial.step1Desc'),
       color: COLORS.primary,
+      tab: 'DashboardTab'
     },
     {
       icon: 'silverware-fork-knife',
       title: t('tutorial.step2Title'),
       desc: t('tutorial.step2Desc'),
       color: '#FCC419', // Gold/yellow for diary
+      tab: 'DashboardTab' // or stay
     },
     {
       icon: 'dumbbell',
       title: t('tutorial.step3Title'),
       desc: t('tutorial.step3Desc'),
       color: '#FF6B6B', // Red/pink for workouts
+      tab: 'WorkoutsTab'
     },
     {
       icon: 'shield-check',
       title: t('tutorial.step4Title'),
       desc: t('tutorial.step4Desc'),
       color: '#4DABF7', // Blue for daily goals
+      tab: 'QuestsTab'
+    },
+    {
+      icon: 'account-group',
+      title: t('tutorial.step5Title') || 'Topluluk',
+      desc: t('tutorial.step5Desc') || 'Diğer kullanıcıların hedeflerini gör ve liderlik tablosunda yarış!',
+      color: '#9C27B0', // Purple for community
+      tab: 'CommunityTab'
     }
   ];
 
   const handleNextStep = () => {
     if (currentStep < TUTORIAL_STEPS.length - 1) {
-      // Animate slide
       const nextIndex = currentStep + 1;
+      
+      // Navigate to the relevant tab behind the modal
+      if (TUTORIAL_STEPS[nextIndex].tab) {
+        navigation.navigate(TUTORIAL_STEPS[nextIndex].tab);
+      }
+
+      // Animate slide
       Animated.timing(slideAnim, {
         toValue: -nextIndex * (width * 0.85),
         duration: 300,
@@ -106,6 +125,7 @@ export default function TutorialModal() {
         })
       ]).start(() => {
         setTutorialSeen(true);
+        navigation.navigate('DashboardTab');
       });
     }
   };
@@ -124,6 +144,7 @@ export default function TutorialModal() {
       })
     ]).start(() => {
       setTutorialSeen(true);
+      navigation.navigate('DashboardTab');
     });
   };
 
@@ -147,9 +168,9 @@ export default function TutorialModal() {
               {TUTORIAL_STEPS.map((step, index) => (
                 <View key={index} style={styles.slide}>
                   
-                  {/* Glowing Icon Container */}
-                  <View style={[styles.iconContainer, { backgroundColor: step.color + '10', borderColor: step.color }]}>
-                    <MaterialCommunityIcons name={step.icon} size={54} color={step.color} />
+                  {/* Minimal Icon Container */}
+                  <View style={[styles.iconContainer]}>
+                    <MaterialCommunityIcons name={step.icon} size={72} color={step.color} />
                   </View>
                   
                   <Text style={styles.title}>{step.title}</Text>
@@ -175,25 +196,26 @@ export default function TutorialModal() {
               ))}
             </View>
 
-            {/* Glowing Next Button */}
+            {/* Minimalist Next Button */}
             <TouchableOpacity 
               style={[
                 styles.button, 
                 { 
-                  backgroundColor: TUTORIAL_STEPS[currentStep].color,
-                  shadowColor: TUTORIAL_STEPS[currentStep].color,
+                  borderColor: TUTORIAL_STEPS[currentStep].color,
+                  borderWidth: 1,
+                  backgroundColor: 'transparent'
                 }
               ]} 
               onPress={handleNextStep}
-              activeOpacity={0.9}
+              activeOpacity={0.7}
             >
-              <Text style={styles.buttonText}>
+              <Text style={[styles.buttonText, { color: TUTORIAL_STEPS[currentStep].color }]}>
                 {currentStep === TUTORIAL_STEPS.length - 1 ? t('tutorial.finish') : t('common.next')}
               </Text>
               <MaterialCommunityIcons 
                 name={currentStep === TUTORIAL_STEPS.length - 1 ? 'check' : 'arrow-right'} 
-                size={16} 
-                color="#0D1117" 
+                size={18} 
+                color={TUTORIAL_STEPS[currentStep].color} 
                 style={{ marginLeft: 6 }} 
               />
             </TouchableOpacity>
@@ -207,19 +229,15 @@ export default function TutorialModal() {
 const getStyles = (COLORS) => StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: COLORS.overlay,
+    backgroundColor: 'rgba(0,0,0,0.85)', // Koyu mat bir arka plan (dark dim)
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContainer: {
     width: width * 0.85,
     height: 430,
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    backgroundColor: 'transparent', // Kutu yok, tamamen havada duruyor
     overflow: 'hidden',
-    ...SHADOWS.card,
     justifyContent: 'space-between',
   },
   modalHeader: {
@@ -230,11 +248,10 @@ const getStyles = (COLORS) => StyleSheet.create({
   skipBtn: {
     paddingHorizontal: SPACING.sm,
     paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.sm,
   },
   skipBtnText: {
-    fontFamily: TYPOGRAPHY.fontFamily.bold,
-    fontSize: FONT_SIZE.xs,
+    fontFamily: TYPOGRAPHY.fontFamily.medium,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.textSecondary,
   },
   sliderViewport: {
@@ -256,26 +273,23 @@ const getStyles = (COLORS) => StyleSheet.create({
   iconContainer: {
     width: 100,
     height: 100,
-    borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    marginBottom: SPACING.lg,
-    ...SHADOWS.glow,
+    marginBottom: SPACING.md,
   },
   title: {
     fontFamily: TYPOGRAPHY.fontFamily.bold,
-    fontSize: FONT_SIZE.lg,
-    color: COLORS.text,
+    fontSize: FONT_SIZE.xl,
+    color: '#FFF', // Her zaman beyaz (overlay olduğu için okunur)
     textAlign: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   desc: {
     fontFamily: TYPOGRAPHY.fontFamily.regular,
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSecondary,
+    fontSize: FONT_SIZE.md,
+    color: '#rgba(255,255,255,0.7)', // Yarı saydam beyaz
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 24,
   },
   footer: {
     padding: SPACING.lg,
@@ -284,17 +298,16 @@ const getStyles = (COLORS) => StyleSheet.create({
   dotsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.xl,
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginHorizontal: 3,
-    transition: 'width 0.2s',
+    marginHorizontal: 4,
   },
   dotActive: {
-    width: 16,
+    width: 20,
   },
   button: {
     width: '100%',
@@ -302,15 +315,10 @@ const getStyles = (COLORS) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    borderRadius: 100, // Tam yuvarlak buton köşeleri (Pill shape)
   },
   buttonText: {
     fontFamily: TYPOGRAPHY.fontFamily.bold,
-    fontSize: FONT_SIZE.sm,
-    color: '#0D1117',
+    fontSize: FONT_SIZE.md,
   }
 });

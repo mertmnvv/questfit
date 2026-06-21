@@ -12,54 +12,48 @@ import { initNotifications } from './src/services/notificationService';
 import { initHealthIntegration } from './src/services/healthService';
 import { useUserStore } from './src/store/userStore';
 
-// Custom Toast Konfigürasyonu
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+// Custom Toast Konfigürasyonu (Solid Flat UI)
 const toastConfig = {
-  // Başarılı / Görev Tamamlandı mesajı
-  success: (props) => (
-    <BaseToast
-      {...props}
-      style={{
-        borderLeftColor: COLORS.success,
-        backgroundColor: COLORS.card,
-        borderWidth: 1,
-        borderColor: COLORS.success,
-        borderRadius: BORDER_RADIUS.md,
-      }}
-      contentContainerStyle={{ paddingHorizontal: 15 }}
-      text1Style={{
-        fontFamily: TYPOGRAPHY.fontFamily.bold,
-        fontSize: FONT_SIZE.md,
-        color: COLORS.text,
-      }}
-      text2Style={{
-        fontFamily: TYPOGRAPHY.fontFamily.bold,
-        fontSize: FONT_SIZE.xs,
-        color: COLORS.accent,
-      }}
-    />
+  success: ({ text1, text2 }) => (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', backgroundColor: '#40C057', 
+      paddingHorizontal: 20, paddingVertical: 16, borderRadius: BORDER_RADIUS.xl,
+      width: '90%', elevation: 10, shadowColor: '#000', shadowOffset: {width:0, height:4}, shadowOpacity: 0.3, shadowRadius: 8
+    }}>
+      <MaterialCommunityIcons name="check-circle" size={28} color="#FFF" />
+      <View style={{ marginLeft: 12, flex: 1 }}>
+        <Text style={{ fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.md, color: '#FFF' }}>{text1}</Text>
+        {text2 ? <Text style={{ fontFamily: TYPOGRAPHY.fontFamily.medium, fontSize: FONT_SIZE.sm, color: 'rgba(255,255,255,0.8)' }}>{text2}</Text> : null}
+      </View>
+    </View>
   ),
-  // Hata mesajı
-  error: (props) => (
-    <ErrorToast
-      {...props}
-      style={{
-        borderLeftColor: COLORS.error,
-        backgroundColor: COLORS.card,
-        borderWidth: 1,
-        borderColor: COLORS.error,
-        borderRadius: BORDER_RADIUS.md,
-      }}
-      text1Style={{
-        fontFamily: TYPOGRAPHY.fontFamily.bold,
-        fontSize: FONT_SIZE.md,
-        color: COLORS.text,
-      }}
-      text2Style={{
-        fontFamily: TYPOGRAPHY.fontFamily.regular,
-        fontSize: FONT_SIZE.sm,
-        color: COLORS.error,
-      }}
-    />
+  error: ({ text1, text2 }) => (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF6B6B', 
+      paddingHorizontal: 20, paddingVertical: 16, borderRadius: BORDER_RADIUS.xl,
+      width: '90%', elevation: 10, shadowColor: '#000', shadowOffset: {width:0, height:4}, shadowOpacity: 0.3, shadowRadius: 8
+    }}>
+      <MaterialCommunityIcons name="alert-circle" size={28} color="#FFF" />
+      <View style={{ marginLeft: 12, flex: 1 }}>
+        <Text style={{ fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.md, color: '#FFF' }}>{text1}</Text>
+        {text2 ? <Text style={{ fontFamily: TYPOGRAPHY.fontFamily.medium, fontSize: FONT_SIZE.sm, color: 'rgba(255,255,255,0.9)' }} numberOfLines={2}>{text2}</Text> : null}
+      </View>
+    </View>
+  ),
+  info: ({ text1, text2 }) => (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', backgroundColor: '#4DABF7', 
+      paddingHorizontal: 20, paddingVertical: 16, borderRadius: BORDER_RADIUS.xl,
+      width: '90%', elevation: 10, shadowColor: '#000', shadowOffset: {width:0, height:4}, shadowOpacity: 0.3, shadowRadius: 8
+    }}>
+      <MaterialCommunityIcons name="information" size={28} color="#FFF" />
+      <View style={{ marginLeft: 12, flex: 1 }}>
+        <Text style={{ fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.md, color: '#FFF' }}>{text1}</Text>
+        {text2 ? <Text style={{ fontFamily: TYPOGRAPHY.fontFamily.medium, fontSize: FONT_SIZE.sm, color: 'rgba(255,255,255,0.9)' }}>{text2}</Text> : null}
+      </View>
+    </View>
   ),
 };
 

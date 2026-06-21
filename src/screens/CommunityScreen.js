@@ -250,7 +250,7 @@ export default function CommunityScreen() {
   // --- STORY ACTIONS ---
   const handleAddStoryClick = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false, // Artık kesmeye zorlamıyoruz, Instagram gibi container kullanacağız
       quality: 0.8,
     });
@@ -281,7 +281,7 @@ export default function CommunityScreen() {
       }
 
       const imageUrl = await uploadImageToCloudinary(uri);
-      await addStory(imageUrl, { uid: user.uid, nickname: profile?.nickname, photoURL: user?.photoURL });
+      await addStory(imageUrl, { uid: user.uid, nickname: profile?.nickname, photoURL: profile?.photoURL || user?.photoURL });
       
       setStoryPreviewImage(null);
       setStoryText('');
@@ -426,7 +426,7 @@ export default function CommunityScreen() {
   // --- POST ACTIONS ---
   const handlePickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
       quality: 0.6,
       base64: true,
@@ -464,7 +464,7 @@ export default function CommunityScreen() {
     try {
       const newComment = await addComment(
         activePost.id, 
-        { uid: user.uid, nickname: profile?.nickname, photoURL: user?.photoURL }, 
+        { uid: user.uid, nickname: profile?.nickname, photoURL: profile?.photoURL || user?.photoURL }, 
         commentInput.trim()
       );
       const updatedPost = { ...activePost, comments: [...(activePost.comments || []), newComment] };
@@ -488,9 +488,18 @@ export default function CommunityScreen() {
 
       if (isFoodPost && selectedImageBase64) {
         Toast.show({ type: 'info', text1: 'AI', text2: t('community.analyzingFood') || 'Yemek analiz ediliyor...' });
-        const aiResults = await analyzeFoodFromImage(selectedImageBase64, i18n.language);
-        if (aiResults && aiResults.length > 0) {
-          foodData = aiResults[0];
+        try {
+          const aiResults = await analyzeFoodFromImage(selectedImageBase64, i18n.language);
+          if (aiResults && aiResults.length > 0) {
+            foodData = aiResults[0];
+          }
+        } catch (aiErr) {
+          Alert.alert(
+            "Yapay Zeka Hatası",
+            "Görsel şu an çalışmıyor. Yemeğin adını gönderi metnine manuel olarak yazmak ister misin?",
+            [{ text: "Tamam" }]
+          );
+          // AI failed, but we still continue to submit the post without macros
         }
       }
 
@@ -501,7 +510,7 @@ export default function CommunityScreen() {
       const postUser = {
         uid: user.uid,
         nickname: profile?.nickname || 'Kahraman',
-        photoURL: user?.photoURL || null,
+        photoURL: profile?.photoURL || user?.photoURL || null,
         isFoodPost,
         foodData
       };

@@ -42,6 +42,7 @@ export default function ProfileScreen() {
   const { user } = useAuth();
   const {
     profile, updateProfileField, setAppTheme, setAppLanguage, setTutorialSeen, clearStore, appTheme,
+    notificationsEnabled, aiCustomPromptEnabled, setNotificationsEnabled, setAiCustomPromptEnabled
   } = useUserStore();
 
   // Screen States
@@ -124,7 +125,7 @@ export default function ProfileScreen() {
 
   const handlePickEditImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
       quality: 0.6,
     });
@@ -154,11 +155,12 @@ export default function ProfileScreen() {
   };
 
   const handleChangeAvatar = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.6,
-    });
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.6,
+      });
     if (!result.canceled && result.assets?.length > 0) {
       setAvatarLoading(true);
       try {
@@ -172,6 +174,10 @@ export default function ProfileScreen() {
       } finally {
         setAvatarLoading(false);
       }
+    }
+    } catch (err) {
+      console.log('Image picker error:', err);
+      Toast.show({ type: 'error', text1: t('common.error'), text2: 'Resim seçilemedi' });
     }
   };
 
@@ -224,6 +230,8 @@ export default function ProfileScreen() {
     setAppTheme(appTheme === 'dark' ? 'light' : 'dark');
   };
 
+
+
   const maxXp = useMemo(() => {
     const currentLevel = profile?.level || 1;
     return 200 * Math.pow(2, currentLevel - 1);
@@ -235,37 +243,52 @@ export default function ProfileScreen() {
   }, [profile?.exp, maxXp]);
 
   const getGoalLabel = (goalKey) => {
-    if (goalKey === 'Lose Weight' || goalKey === 'Lose') return t('profile.goalLose');
-    if (goalKey === 'Maintain Weight' || goalKey === 'Maintain') return t('profile.goalMaintain');
-    if (goalKey === 'Build Muscle' || goalKey === 'Gain') return t('profile.goalGain');
-    return goalKey;
+    if (!goalKey) return '';
+    const key = goalKey.toLowerCase();
+    if (key === 'lose weight' || key === 'lose') return t('profile.goalLose');
+    if (key === 'maintain weight' || key === 'maintain') return t('profile.goalMaintain');
+    if (key === 'build muscle' || key === 'gain') return t('profile.goalGain');
+    
+    // Fallback: İlk harfini büyüterek döndür
+    return goalKey.charAt(0).toUpperCase() + goalKey.slice(1);
   };
 
   // --- Render Functions ---
   const renderHeader = () => (
     <View style={styles.headerContainer}>
-      <TouchableOpacity style={styles.crestCircle} onPress={handleChangeAvatar} disabled={avatarLoading}>
-        {avatarLoading ? (
-          <ActivityIndicator size="small" color={COLORS_THEME.primary} />
-        ) : avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-        ) : (
-          <MaterialCommunityIcons name="camera-plus" size={32} color={COLORS_THEME.primary} />
-        )}
-      </TouchableOpacity>
-      <View style={styles.crestLevelBadge}>
-        <Text style={styles.crestLevelText}>LEVEL {profile?.level || 1}</Text>
-      </View>
+      <View style={styles.headerTopRow}>
+        <TouchableOpacity style={styles.crestCircle} onPress={handleChangeAvatar} disabled={avatarLoading}>
+          {avatarLoading ? (
+            <ActivityIndicator size="small" color={COLORS_THEME.primary} />
+          ) : avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <MaterialCommunityIcons name="camera-plus" size={24} color={COLORS_THEME.primary} />
+          )}
+        </TouchableOpacity>
 
-      <TouchableOpacity style={styles.nicknameRow} onPress={() => { setNicknameInput(profile?.nickname || ''); setNicknameModalVisible(true); }}>
-        <Text style={styles.nicknameText}>{profile?.nickname || 'User'}</Text>
-        <MaterialCommunityIcons name="pencil-circle" size={20} color={COLORS_THEME.primary} style={{ marginLeft: 6 }} />
-      </TouchableOpacity>
+        <View style={styles.headerInfo}>
+          <View style={styles.nicknameRow}>
+            <TouchableOpacity onPress={() => { setNicknameInput(profile?.nickname || ''); setNicknameModalVisible(true); }}>
+              <Text style={styles.nicknameText}>{profile?.nickname || 'User'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setNicknameInput(profile?.nickname || ''); setNicknameModalVisible(true); }}>
+              <MaterialCommunityIcons name="pencil-circle" size={18} color={COLORS_THEME.primary} style={{ marginLeft: 4, marginRight: 8 }} />
+            </TouchableOpacity>
+            <View style={styles.crestLevelBadge}>
+              <Text style={styles.crestLevelText}>LVL {profile?.level || 1}</Text>
+            </View>
+          </View>
 
-      <View style={styles.xpContainer}>
-        <Text style={styles.xpProgressText}>{profile?.exp || 0} / {maxXp} XP</Text>
-        <View style={styles.xpBarBg}>
-          <View style={[styles.xpBarFill, { width: `${xpProgress}%`, backgroundColor: COLORS_THEME.primary }]} />
+          <View style={styles.xpContainer}>
+            <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4}}>
+              <Text style={styles.xpProgressText}>XP</Text>
+              <Text style={styles.xpProgressText}>{profile?.exp || 0} / {maxXp}</Text>
+            </View>
+            <View style={styles.xpBarBg}>
+              <View style={[styles.xpBarFill, { width: `${xpProgress}%`, backgroundColor: COLORS_THEME.primary }]} />
+            </View>
+          </View>
         </View>
       </View>
 
@@ -324,7 +347,7 @@ export default function ProfileScreen() {
       <Text style={styles.settingsGroupTitle}>{t('profile.settings')}</Text>
       <View style={styles.settingsGroup}>
         <TouchableOpacity style={styles.settingsRow} onPress={() => navigation.navigate('Stats')}>
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(250,176,5,0.1)' }]}><MaterialCommunityIcons name="scale-bathroom" size={22} color="#FAB005" /></View>
+          <View style={[styles.iconBox, { backgroundColor: '#FAB005' }]}><MaterialCommunityIcons name="scale-bathroom" size={22} color="#FFF" /></View>
           <View style={styles.settingsTextContainer}>
             <Text style={styles.settingsLabel}>{t('profile.weightAndStats')}</Text>
             <Text style={styles.settingsValue}>{profile?.weight || '75'} kg</Text>
@@ -333,7 +356,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         <View style={styles.settingsDivider} />
         <TouchableOpacity style={styles.settingsRow} onPress={() => setGoalModalVisible(true)}>
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(64,192,87,0.1)' }]}><MaterialCommunityIcons name="target" size={22} color={COLORS_THEME.primary} /></View>
+          <View style={[styles.iconBox, { backgroundColor: COLORS_THEME.primary }]}><MaterialCommunityIcons name="target" size={22} color="#FFF" /></View>
           <View style={styles.settingsTextContainer}>
             <Text style={styles.settingsLabel}>{t('profile.dietTarget')}</Text>
             <Text style={styles.settingsValue}>{getGoalLabel(profile?.goal)}</Text>
@@ -342,7 +365,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         <View style={styles.settingsDivider} />
         <TouchableOpacity style={styles.settingsRow} onPress={() => { setWaterInput(profile?.customMicros?.water?.toString() || '2.5'); setFiberInput(profile?.customMicros?.fiber?.toString() || '30'); setMicrosModalVisible(true); }}>
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(77,171,247,0.1)' }]}><MaterialCommunityIcons name="water-percent" size={22} color="#4DABF7" /></View>
+          <View style={[styles.iconBox, { backgroundColor: '#4DABF7' }]}><MaterialCommunityIcons name="water-percent" size={22} color="#FFF" /></View>
           <View style={styles.settingsTextContainer}>
             <Text style={styles.settingsLabel}>{t('profile.microTargets')}</Text>
             <Text style={styles.settingsValue}>{profile?.customMicros?.water || '2.5'}L / {profile?.customMicros?.fiber || '30'}g</Text>
@@ -351,7 +374,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         <View style={styles.settingsDivider} />
         <TouchableOpacity style={styles.settingsRow} onPress={() => { setStepInput(profile?.stepTarget?.toString() || '10000'); setStepModalVisible(true); }}>
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(255,146,43,0.1)' }]}><MaterialCommunityIcons name="shoe-print" size={22} color="#FF922B" /></View>
+          <View style={[styles.iconBox, { backgroundColor: '#FF922B' }]}><MaterialCommunityIcons name="shoe-print" size={22} color="#FFF" /></View>
           <View style={styles.settingsTextContainer}>
             <Text style={styles.settingsLabel}>{t('profile.stepTarget')}</Text>
             <Text style={styles.settingsValue}>{profile?.stepTarget || '10000'}</Text>
@@ -364,7 +387,7 @@ export default function ProfileScreen() {
       <Text style={styles.settingsGroupTitle}>{t('profile.systemPrefs')}</Text>
       <View style={styles.settingsGroup}>
         <TouchableOpacity style={styles.settingsRow} onPress={toggleLanguage}>
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(252,196,25,0.1)' }]}><MaterialCommunityIcons name="translate" size={22} color="#FCC419" /></View>
+          <View style={[styles.iconBox, { backgroundColor: '#FCC419' }]}><MaterialCommunityIcons name="translate" size={22} color="#FFF" /></View>
           <View style={styles.settingsTextContainer}>
             <Text style={styles.settingsLabel}>{t('profile.appLanguage')}</Text>
             <Text style={styles.settingsValue}>{i18n.language === 'tr' ? 'Türkçe' : 'English'}</Text>
@@ -373,9 +396,9 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         <View style={styles.settingsDivider} />
         <TouchableOpacity style={styles.settingsRow} onPress={toggleTheme}>
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(151,117,250,0.1)' }]}><MaterialCommunityIcons name={appTheme === 'dark' ? 'weather-night' : 'weather-sunny'} size={22} color="#9775FA" /></View>
+          <View style={[styles.iconBox, { backgroundColor: '#9775FA' }]}><MaterialCommunityIcons name={appTheme === 'dark' ? 'weather-night' : 'weather-sunny'} size={22} color="#FFF" /></View>
           <View style={styles.settingsTextContainer}>
-            <Text style={styles.settingsLabel}>{t('profile.appearance')}</Text>
+            <Text style={styles.settingsLabel}>{t('profile.appearance') || 'Görünüm'}</Text>
             <Text style={styles.settingsValue}>{appTheme === 'dark' ? 'Dark Mode' : 'Light Mode'}</Text>
           </View>
           <MaterialCommunityIcons name="theme-light-dark" size={24} color={COLORS_THEME.textSecondary} />
@@ -386,7 +409,7 @@ export default function ProfileScreen() {
       <Text style={styles.settingsGroupTitle}>{t('profile.accountActions')}</Text>
       <View style={styles.settingsGroup}>
         <TouchableOpacity style={styles.settingsRow} onPress={handleReplayTutorial}>
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(32,201,151,0.1)' }]}><MaterialCommunityIcons name="information-variant" size={22} color="#20C997" /></View>
+          <View style={[styles.iconBox, { backgroundColor: '#20C997' }]}><MaterialCommunityIcons name="information-variant" size={22} color="#FFF" /></View>
           <View style={styles.settingsTextContainer}>
             <Text style={styles.settingsLabel}>{t('profile.replayTutorial')}</Text>
           </View>
@@ -394,7 +417,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         <View style={styles.settingsDivider} />
         <TouchableOpacity style={styles.settingsRow} onPress={handleLogout}>
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(250,82,82,0.1)' }]}><MaterialCommunityIcons name="logout-variant" size={22} color="#FA5252" /></View>
+          <View style={[styles.iconBox, { backgroundColor: '#FA5252' }]}><MaterialCommunityIcons name="logout-variant" size={22} color="#FFF" /></View>
           <View style={styles.settingsTextContainer}>
             <Text style={[styles.settingsLabel, { color: COLORS_THEME.error }]}>{t('profile.logout')}</Text>
           </View>
@@ -550,44 +573,52 @@ const getStyles = (COLORS) => StyleSheet.create({
   },
   headerContainer: {
     paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 16,
-    alignItems: 'center',
     backgroundColor: COLORS.card,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.lg,
+  },
   crestCircle: {
-    width: 90, height: 90, borderRadius: 45,
-    backgroundColor: COLORS.background, borderWidth: 2, borderColor: COLORS.primary,
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: COLORS.background, borderWidth: 1, borderColor: COLORS.border,
     justifyContent: 'center', alignItems: 'center',
-    overflow: 'hidden',
+    overflow: 'hidden', marginRight: SPACING.lg,
   },
   avatarImage: {
-    width: '100%', height: '100%', borderRadius: 45,
+    width: '100%', height: '100%', borderRadius: 36,
   },
-  crestLevelBadge: {
-    marginTop: -12, backgroundColor: COLORS.primary, paddingHorizontal: 12, paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.full, borderWidth: 2, borderColor: COLORS.card,
-  },
-  crestLevelText: {
-    fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 12, color: '#0D1117',
+  headerInfo: {
+    flex: 1, justifyContent: 'center',
   },
   nicknameRow: {
-    flexDirection: 'row', alignItems: 'center', marginTop: SPACING.md,
+    flexDirection: 'row', alignItems: 'center', marginBottom: 4,
   },
   nicknameText: {
-    fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 22, color: COLORS.text,
+    fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 20, color: COLORS.text,
+  },
+  crestLevelBadge: {
+    backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.primary,
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 12,
+  },
+  crestLevelText: {
+    fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 10, color: COLORS.primary,
   },
   xpContainer: {
-    width: '60%', marginTop: SPACING.md, alignItems: 'center', marginBottom: SPACING.lg,
+    width: '100%', marginTop: 2,
   },
   xpProgressText: {
-    fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 12, color: COLORS.textSecondary, marginBottom: 6,
+    fontFamily: TYPOGRAPHY.fontFamily.medium, fontSize: 11, color: COLORS.textSecondary,
   },
   xpBarBg: {
-    width: '100%', height: 6, backgroundColor: COLORS.border, borderRadius: BORDER_RADIUS.full, overflow: 'hidden',
+    width: '100%', height: 4, backgroundColor: COLORS.border, borderRadius: 2, overflow: 'hidden',
   },
   xpBarFill: {
-    height: '100%', borderRadius: BORDER_RADIUS.full,
+    height: '100%', borderRadius: 2,
   },
   
   // Tabs
@@ -613,10 +644,10 @@ const getStyles = (COLORS) => StyleSheet.create({
   },
   settingsGroupTitle: {
     fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: 13, color: COLORS.textSecondary,
-    textTransform: 'uppercase', marginBottom: SPACING.sm, marginTop: SPACING.md,
+    textTransform: 'uppercase', marginBottom: SPACING.sm, marginTop: SPACING.md, paddingLeft: 4,
   },
   settingsGroup: {
-    backgroundColor: COLORS.card, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden',
+    backgroundColor: COLORS.card, borderRadius: BORDER_RADIUS.xl, overflow: 'hidden', ...SHADOWS.card,
   },
   settingsRow: {
     flexDirection: 'row', alignItems: 'center', padding: SPACING.md,
@@ -634,7 +665,7 @@ const getStyles = (COLORS) => StyleSheet.create({
 
   // Posts
   postCard: {
-    padding: SPACING.lg, borderBottomWidth: 1, borderBottomColor: COLORS.border, backgroundColor: COLORS.background,
+    padding: SPACING.lg, marginBottom: SPACING.md, backgroundColor: COLORS.card, borderRadius: BORDER_RADIUS.xl, ...SHADOWS.card, marginHorizontal: SPACING.lg,
   },
   postHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm,

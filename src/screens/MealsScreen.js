@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Modal, Dimensions, Platform, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -51,6 +51,8 @@ export default function MealsScreen() {
   const [showCamera, setShowCamera] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(false);
+  const searchInputRef = useRef(null);
 
   // Search logic
   useEffect(() => {
@@ -130,6 +132,9 @@ export default function MealsScreen() {
   };
 
   const handleImagePick = async () => {
+    setShowComingSoon(true);
+    return;
+    /*
     try {
       let result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -151,8 +156,15 @@ export default function MealsScreen() {
             setErrorMsg(t('meals.foodNotFound'));
           }
         } catch (err) {
-          setErrorMsg(t('meals.aiImageError'));
-          Alert.alert(t('meals.errorDetails'), err.message || err.toString());
+          setErrorMsg(t('meals.aiImageError') || 'Görsel Hatası');
+          Alert.alert(
+            "Yapay Zeka Hatası",
+            "Görsel şu an çalışmıyor. Yemeğin adını arama kutusuna manuel girmek ister misin?",
+            [
+              { text: "Hayır", style: "cancel" },
+              { text: "Evet", onPress: () => searchInputRef.current?.focus() }
+            ]
+          );
         } finally {
           setLoading(false);
         }
@@ -160,6 +172,7 @@ export default function MealsScreen() {
     } catch (err) {
       console.error(err);
     }
+    */
   };
 
   const handleBarcodeScanned = async ({ type, data }) => {
@@ -185,6 +198,9 @@ export default function MealsScreen() {
   };
 
   const openCamera = async () => {
+    setShowComingSoon(true);
+    return;
+    /*
     if (!cameraPermission?.granted) {
       const res = await requestCameraPermission();
       if (!res.granted) {
@@ -193,6 +209,8 @@ export default function MealsScreen() {
       }
     }
     setShowCamera(true);
+    setScanning(false);
+    */
   };
 
 
@@ -216,6 +234,7 @@ export default function MealsScreen() {
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color={COLORS_THEME.textSecondary} style={styles.searchIcon} />
           <TextInput
+            ref={searchInputRef}
             style={styles.searchInput}
             placeholder={t('meals.searchPlaceholder')}
             placeholderTextColor={COLORS_THEME.textSecondary}
@@ -398,6 +417,23 @@ export default function MealsScreen() {
         </View>
       </Modal>
 
+      {/* Coming Soon Premium Modal */}
+      <Modal transparent animationType="fade" visible={showComingSoon}>
+        <View style={styles.comingSoonOverlay}>
+          <TouchableOpacity style={styles.comingSoonDismiss} onPress={() => setShowComingSoon(false)} />
+          <View style={styles.comingSoonContent}>
+            <LinearGradient colors={[COLORS_THEME.primary, COLORS_THEME.accent]} style={styles.comingSoonIconBg}>
+              <MaterialCommunityIcons name="rocket-launch" size={32} color="#fff" />
+            </LinearGradient>
+            <Text style={styles.comingSoonTitle}>Çok Yakında</Text>
+            <Text style={styles.comingSoonDesc}>Görsel ile akıllı yemek tanıma özelliği tam sürümde sizlerle olacak.</Text>
+            <TouchableOpacity style={styles.comingSoonBtn} onPress={() => setShowComingSoon(false)}>
+              <Text style={styles.comingSoonBtnText}>Anladım</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -462,17 +498,20 @@ const getStyles = (COLORS_THEME) => StyleSheet.create({
   
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalDismiss: { flex: 1 },
-  modalContent: {
-    backgroundColor: COLORS_THEME.card,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    padding: SPACING.xl,
-    paddingBottom: Platform.OS === 'ios' ? 40 : SPACING.xl,
-    borderWidth: 1,
-    borderColor: COLORS_THEME.border,
-  },
+  modalContent: { backgroundColor: COLORS_THEME.card, borderTopLeftRadius: BORDER_RADIUS.xl, borderTopRightRadius: BORDER_RADIUS.xl, padding: SPACING.xl },
   modalIndicator: { width: 40, height: 4, backgroundColor: COLORS_THEME.border, borderRadius: 2, alignSelf: 'center', marginBottom: SPACING.lg },
-  modalTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.xl, color: COLORS_THEME.text, textAlign: 'center', marginBottom: SPACING.xl },
+  modalTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.xl, color: COLORS_THEME.text, marginBottom: SPACING.md },
+  modalDesc: { fontFamily: TYPOGRAPHY.fontFamily.regular, fontSize: FONT_SIZE.sm, color: COLORS_THEME.textSecondary, marginBottom: SPACING.lg, lineHeight: 20 },
+
+  // Coming Soon Modal Styles
+  comingSoonOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: SPACING.xl },
+  comingSoonDismiss: { ...StyleSheet.absoluteFillObject },
+  comingSoonContent: { width: '100%', backgroundColor: COLORS_THEME.cardLight, borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  comingSoonIconBg: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.lg },
+  comingSoonTitle: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.xl, color: COLORS_THEME.text, marginBottom: SPACING.sm },
+  comingSoonDesc: { fontFamily: TYPOGRAPHY.fontFamily.regular, fontSize: FONT_SIZE.md, color: COLORS_THEME.textSecondary, textAlign: 'center', marginBottom: SPACING.xl, lineHeight: 22 },
+  comingSoonBtn: { width: '100%', backgroundColor: COLORS_THEME.surface, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.md, alignItems: 'center', borderWidth: 1, borderColor: COLORS_THEME.border },
+  comingSoonBtnText: { fontFamily: TYPOGRAPHY.fontFamily.bold, fontSize: FONT_SIZE.md, color: COLORS_THEME.text },
   
   macrosContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.xl, paddingHorizontal: SPACING.md },
   macroBox: { alignItems: 'center' },

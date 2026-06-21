@@ -197,7 +197,7 @@ export default function QuestScreen() {
           
           {/* Level Tracker Card */}
           <View style={styles.levelCard}>
-            <LinearGradient colors={['rgba(43,138,62,0.15)', 'rgba(64,192,87,0.05)']} style={styles.levelCardGradient}>
+            <View style={styles.levelCardInner}>
               <View style={styles.levelHeader}>
                 <View style={styles.levelCircle}>
                   <Text style={styles.levelNum}>{level}</Text>
@@ -215,7 +215,7 @@ export default function QuestScreen() {
               <View style={styles.xpBarBackground}>
                 <View style={[styles.xpBarFill, { width: `${xpProgress}%` }]} />
               </View>
-            </LinearGradient>
+            </View>
           </View>
 
           {/* Goals Checklist Title */}
@@ -360,6 +360,7 @@ const getStyles = (COLORS_THEME) => StyleSheet.create({
     padding: SPACING.lg,
   },
   levelCard: {
+    backgroundColor: COLORS_THEME.card,
     borderRadius: BORDER_RADIUS.lg,
     overflow: 'hidden',
     borderWidth: 1,
@@ -367,7 +368,7 @@ const getStyles = (COLORS_THEME) => StyleSheet.create({
     marginBottom: SPACING.xl,
     ...SHADOWS.card,
   },
-  levelCardGradient: {
+  levelCardInner: {
     padding: SPACING.lg,
   },
   levelHeader: {

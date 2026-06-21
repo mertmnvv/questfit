@@ -79,73 +79,70 @@ export default function WorkoutsScreen() {
          ex.subGroup.toLowerCase().includes('kardiyo'))
       ).slice(0, 4);
     } else {
-      // Find and rank muscles by fatigue ascending (least fatigued first)
-      const rankedMuscles = Object.entries(fatigueData).sort((a, b) => a[1] - b[1]);
-      const targetMuscles = rankedMuscles.slice(0, 3).map(m => m[0]); // Top 3 recovered groups
+      // Hedef: Full Body Antrenmanı
+      const mainGroups = [
+        ['Bacak'], 
+        ['Sırt'], 
+        ['Göğüs'], 
+        ['Omuz'], 
+        ['Kollar'], 
+        ['Karın']
+      ];
 
-      // Map fatigue keys to database muscle names
-      const mapFatigueKeyToDb = (key) => {
-        switch (key) {
-          case 'chest': return ['Göğüs'];
-          case 'back': return ['Sırt'];
-          case 'legs': return ['Bacak'];
-          case 'arms': return ['Kollar', 'Omuz'];
-          case 'core': return ['Karın'];
-          default: return [];
-        }
-      };
-
-      const dbMuscleGroups = targetMuscles.flatMap(m => mapFatigueKeyToDb(m));
-
-      // Candidates matching locations and target muscles
-      let candidates = exercisesForLocation.filter(ex => dbMuscleGroups.includes(ex.muscleGroup));
-
-      if (candidates.length === 0) {
-        candidates = exercisesForLocation; // Fallback
-      }
-
-      // Shuffle and pick 4-5 exercises
-      const shuffled = [...candidates].sort(() => 0.5 - Math.random());
       const selected = [];
-      const countByMuscle = {};
-
       const userGoal = profile?.goal || 'Maintain Weight';
 
-      for (const ex of shuffled) {
-        if (selected.length >= 5) break;
-        countByMuscle[ex.muscleGroup] = (countByMuscle[ex.muscleGroup] || 0) + 1;
-        // Limit chest/legs to max 2 exercises in AI workout to ensure balance
-        if (countByMuscle[ex.muscleGroup] <= 2) {
-          let modifiedEx = { ...ex };
+      // Her kas grubu için o lokasyona uygun rastgele 1 hareket seç
+      for (const group of mainGroups) {
+        const candidates = exercisesForLocation.filter(ex => group.includes(ex.muscleGroup));
+        
+        if (candidates.length > 0) {
+          const randomEx = candidates[Math.floor(Math.random() * candidates.length)];
+          let modifiedEx = { ...randomEx };
+          
           // Hedefe göre antrenman sistemini adapte et
           if (userGoal === 'Lose Weight') {
-            modifiedEx.defaultReps = (modifiedEx.defaultReps || 12) + 3; // Daha yüksek tekrar (Kardiyovasküler/Kalori Yakımı)
+            modifiedEx.defaultReps = (modifiedEx.defaultReps || 12) + 3; // Daha yüksek tekrar
           } else if (userGoal === 'Build Muscle') {
-            modifiedEx.defaultReps = Math.max(6, (modifiedEx.defaultReps || 10) - 2); // Daha düşük tekrar, hipertrofi odaklı
-            modifiedEx.defaultSets = (modifiedEx.defaultSets || 3) + 1; // Daha fazla set (Hacim)
+            modifiedEx.defaultReps = Math.max(6, (modifiedEx.defaultReps || 10) - 2); // Daha düşük tekrar
+            modifiedEx.defaultSets = (modifiedEx.defaultSets || 3) + 1; // Daha fazla set
           }
           selected.push(modifiedEx);
         }
       }
 
-      // Fill up to 5 if needed
-      if (selected.length < 5) {
-        for (const ex of shuffled) {
-          if (selected.length >= 5) break;
-          if (!selected.find(s => s.id === ex.id)) {
-            let modifiedEx = { ...ex };
-            if (userGoal === 'Lose Weight') {
-              modifiedEx.defaultReps = (modifiedEx.defaultReps || 12) + 3;
-            } else if (userGoal === 'Build Muscle') {
-              modifiedEx.defaultReps = Math.max(6, (modifiedEx.defaultReps || 10) - 2);
-              modifiedEx.defaultSets = (modifiedEx.defaultSets || 3) + 1;
-            }
-            selected.push(modifiedEx);
+      // Eğer o lokasyonda bazı kas grupları eksikse (örn. toplam 6'dan az hareket olduysa), eksikleri rastgele tamamla
+      if (selected.length < 6) {
+        const remaining = exercisesForLocation.filter(ex => !selected.find(s => s.id === ex.id));
+        const shuffledRemaining = remaining.sort(() => 0.5 - Math.random());
+        for (const ex of shuffledRemaining) {
+          if (selected.length >= 6) break;
+          let modifiedEx = { ...ex };
+          if (userGoal === 'Lose Weight') {
+            modifiedEx.defaultReps = (modifiedEx.defaultReps || 12) + 3;
+          } else if (userGoal === 'Build Muscle') {
+            modifiedEx.defaultReps = Math.max(6, (modifiedEx.defaultReps || 10) - 2);
+            modifiedEx.defaultSets = (modifiedEx.defaultSets || 3) + 1;
           }
+          selected.push(modifiedEx);
         }
       }
 
-      selectedExercises = selected;
+      // Egzersizleri istenen sıraya göre diz: Bacak, Sırt, Göğüs, Omuz, Kollar, Karın
+      const orderMap = {
+        'Bacak': 1,
+        'Sırt': 2,
+        'Göğüs': 3,
+        'Omuz': 4,
+        'Kollar': 5,
+        'Karın': 6
+      };
+      
+      selectedExercises = selected.sort((a, b) => {
+        const orderA = orderMap[a.muscleGroup] || 99;
+        const orderB = orderMap[b.muscleGroup] || 99;
+        return orderA - orderB;
+      });
     }
 
     // Return final workout package
@@ -290,31 +287,30 @@ export default function WorkoutsScreen() {
     <View style={styles.container}>
       <LinearGradient colors={[COLORS_THEME.background, COLORS_THEME.card, COLORS_THEME.background]} style={styles.gradient}>
         
-        {/* Header */}
+        {/* Premium Minimalist Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>{t('workouts.title')}</Text>
-            <Text style={styles.headerSubtitle}>
-              {t('common.back') === 'Geri' ? 'Günlük egzersizlerini ve planlarını yönet' : 'Manage your routines & daily fitness plan'}
-            </Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity
-              style={[styles.locationPill, { marginRight: SPACING.sm }]}
-              onPress={() => setLocationModalVisible(true)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name={workoutLocation === 'Gym' ? 'barbell' : 'home'} size={14} color={COLORS_THEME.primary} />
-              <Text style={styles.locationText}>{getLocationLabel(workoutLocation)}</Text>
-              <MaterialCommunityIcons name="chevron-down" size={16} color={COLORS_THEME.primary} />
-            </TouchableOpacity>
-
+          <View style={styles.headerTopRow}>
+            <Text style={styles.headerTitle} numberOfLines={1}>{t('workouts.title')}</Text>
             <TouchableOpacity 
               style={styles.historyBtn} 
               onPress={() => navigation.navigate('WorkoutHistory')}
               activeOpacity={0.8}
             >
-              <MaterialCommunityIcons name="history" size={24} color={COLORS_THEME.primary} />
+              <MaterialCommunityIcons name="history" size={24} color={COLORS_THEME.text} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.headerSubtitle}>
+            {t('common.back') === 'Geri' ? 'Günlük egzersizlerini ve planlarını yönet' : 'Manage your routines & daily fitness plan'}
+          </Text>
+          <View style={styles.headerBottomRow}>
+            <TouchableOpacity
+              style={styles.locationChip}
+              onPress={() => setLocationModalVisible(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name={workoutLocation === 'Gym' ? 'barbell' : 'home'} size={14} color={COLORS_THEME.primary} />
+              <Text style={styles.locationChipText}>{getLocationLabel(workoutLocation)}</Text>
+              <MaterialCommunityIcons name="chevron-down" size={16} color={COLORS_THEME.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -328,10 +324,7 @@ export default function WorkoutsScreen() {
               <Text style={styles.sectionTitle}>{t('workouts.aiRecommendation')}</Text>
             </View>
 
-            <LinearGradient
-              colors={aiWorkout.isRecovery ? ['rgba(64,192,87,0.08)', 'rgba(64,192,87,0.02)'] : ['rgba(43,138,62,0.08)', 'rgba(43,138,62,0.02)']}
-              style={[styles.aiCard, { borderColor: aiWorkout.isRecovery ? COLORS_THEME.success : COLORS_THEME.primary }]}
-            >
+            <View style={[styles.aiCard, { borderColor: aiWorkout.isRecovery ? COLORS_THEME.success : COLORS_THEME.border }]}>
               <View style={styles.aiCardHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.aiCardTitle, { color: aiWorkout.isRecovery ? COLORS_THEME.success : COLORS_THEME.text }]}>
@@ -340,8 +333,8 @@ export default function WorkoutsScreen() {
                   <Text style={styles.aiCardSubtitle}>{t('workouts.aiRecommendationDesc')}</Text>
                 </View>
                 {aiWorkout.isRecovery && (
-                  <View style={[styles.recoveryBadge, { backgroundColor: COLORS_THEME.success }]}>
-                    <Text style={styles.recoveryBadgeText}>RECOVERY</Text>
+                  <View style={[styles.recoveryBadge, { backgroundColor: 'rgba(64,192,87,0.15)' }]}>
+                    <Text style={[styles.recoveryBadgeText, { color: COLORS_THEME.success }]}>RECOVERY</Text>
                   </View>
                 )}
               </View>
@@ -367,21 +360,21 @@ export default function WorkoutsScreen() {
 
               {/* Start Workout Button */}
               {consumedToday?.aiWorkoutCompletedToday ? (
-                <View style={[styles.startButton, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                <View style={[styles.startButton, { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
                   <Text style={[styles.startButtonText, { color: COLORS_THEME.textSecondary }]}>{t('workouts.aiWorkoutCompletedToday')}</Text>
                   <MaterialCommunityIcons name="check-circle" size={18} color={COLORS_THEME.textSecondary} />
                 </View>
               ) : (
                 <TouchableOpacity
-                  style={[styles.startButton, { backgroundColor: aiWorkout.isRecovery ? COLORS_THEME.success : COLORS_THEME.primary }]}
+                  style={[styles.startButton, { backgroundColor: 'transparent', borderWidth: 1, borderColor: aiWorkout.isRecovery ? COLORS_THEME.success : COLORS_THEME.primary }]}
                   onPress={() => handleStartWorkout({ ...aiWorkout, isAi: true })}
-                  activeOpacity={0.9}
+                  activeOpacity={0.6}
                 >
-                  <Text style={styles.startButtonText}>{t('workouts.startNow')}</Text>
-                  <MaterialCommunityIcons name="play" size={18} color="#0D1117" />
+                  <Text style={[styles.startButtonText, { color: aiWorkout.isRecovery ? COLORS_THEME.success : COLORS_THEME.primary }]}>{t('workouts.startNow')}</Text>
+                  <MaterialCommunityIcons name="arrow-right" size={18} color={aiWorkout.isRecovery ? COLORS_THEME.success : COLORS_THEME.primary} />
                 </TouchableOpacity>
               )}
-            </LinearGradient>
+            </View>
           </View>
 
           {/* 2. Muscle Heatmap Section */}
@@ -596,47 +589,49 @@ const getStyles = (COLORS_THEME) => StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS_THEME.border,
+  },
+  headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS_THEME.border,
   },
   headerTitle: {
     fontFamily: TYPOGRAPHY.fontFamily.bold,
     fontSize: FONT_SIZE.xxl,
     color: COLORS_THEME.text,
+    flex: 1,
+    marginRight: SPACING.md,
+  },
+  historyBtn: {
+    padding: SPACING.xs,
   },
   headerSubtitle: {
     fontFamily: TYPOGRAPHY.fontFamily.regular,
-    fontSize: FONT_SIZE.xs,
+    fontSize: FONT_SIZE.sm,
     color: COLORS_THEME.textSecondary,
-    marginTop: 2,
+    marginTop: 4,
+    marginBottom: SPACING.md,
   },
-  locationPill: {
+  headerBottomRow: {
+    flexDirection: 'row',
+  },
+  locationChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS_THEME.card,
+    backgroundColor: 'rgba(255,255,255,0.03)',
     borderWidth: 1,
-    borderColor: COLORS_THEME.border,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
     borderRadius: BORDER_RADIUS.full,
-    ...SHADOWS.card,
   },
-  locationText: {
-    fontFamily: TYPOGRAPHY.fontFamily.bold,
-    fontSize: 11,
+  locationChipText: {
+    fontFamily: TYPOGRAPHY.fontFamily.medium,
+    fontSize: 12,
     color: COLORS_THEME.text,
-    marginHorizontal: 4,
-  },
-  historyBtn: {
-    backgroundColor: COLORS_THEME.card,
-    borderWidth: 1,
-    borderColor: COLORS_THEME.border,
-    padding: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-    ...SHADOWS.card,
+    marginHorizontal: 6,
   },
   scrollContent: {
     padding: SPACING.lg,
@@ -671,102 +666,95 @@ const getStyles = (COLORS_THEME) => StyleSheet.create({
   
   // AI Recommended Card Styles
   aiCard: {
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    borderWidth: 1,
-    ...SHADOWS.card,
+    paddingVertical: SPACING.md,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
   },
   aiCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
-    paddingBottom: SPACING.sm,
+    marginBottom: SPACING.xl,
   },
   aiCardTitle: {
     fontFamily: TYPOGRAPHY.fontFamily.bold,
-    fontSize: FONT_SIZE.lg,
+    fontSize: 20,
+    color: COLORS_THEME.text,
   },
   aiCardSubtitle: {
     fontFamily: TYPOGRAPHY.fontFamily.regular,
-    fontSize: FONT_SIZE.xs,
+    fontSize: FONT_SIZE.sm,
     color: COLORS_THEME.textSecondary,
-    marginTop: 2,
+    marginTop: 4,
   },
   recoveryBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.full,
   },
   recoveryBadgeText: {
     fontFamily: TYPOGRAPHY.fontFamily.bold,
-    fontSize: 8,
+    fontSize: 10,
     color: '#0D1117',
   },
   exercisesList: {
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.xl,
   },
   exerciseItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: SPACING.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.03)',
+    marginBottom: SPACING.sm,
+    borderBottomWidth: 0,
   },
   exerciseIndexContainer: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    width: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.sm,
+    marginRight: SPACING.md,
   },
   exerciseIndex: {
-    fontFamily: TYPOGRAPHY.fontFamily.bold,
-    fontSize: FONT_SIZE.xs,
-    color: COLORS_THEME.textSecondary,
+    fontFamily: TYPOGRAPHY.fontFamily.medium,
+    fontSize: FONT_SIZE.md,
+    color: COLORS_THEME.primary,
   },
   exerciseName: {
     fontFamily: TYPOGRAPHY.fontFamily.bold,
-    fontSize: FONT_SIZE.sm,
+    fontSize: 15,
     color: COLORS_THEME.text,
+    marginBottom: 2,
   },
   exerciseTarget: {
     fontFamily: TYPOGRAPHY.fontFamily.regular,
-    fontSize: 10,
+    fontSize: 11,
     color: COLORS_THEME.textSecondary,
-    marginTop: 2,
   },
   exerciseSpecs: {
     alignItems: 'flex-end',
   },
   exerciseSets: {
     fontFamily: TYPOGRAPHY.fontFamily.bold,
-    fontSize: FONT_SIZE.xs,
-    color: COLORS_THEME.primary,
+    fontSize: 12,
+    color: COLORS_THEME.success,
   },
   exerciseReps: {
     fontFamily: TYPOGRAPHY.fontFamily.regular,
-    fontSize: 10,
+    fontSize: 11,
     color: COLORS_THEME.textSecondary,
-    marginTop: 1,
+    marginTop: 2,
   },
   startButton: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-    ...SHADOWS.button,
+    borderRadius: BORDER_RADIUS.full,
   },
   startButtonText: {
     fontFamily: TYPOGRAPHY.fontFamily.bold,
-    color: '#0D1117',
     fontSize: FONT_SIZE.md,
-    marginRight: 6,
+    marginRight: 8,
   },
 
   // Heatmap styles

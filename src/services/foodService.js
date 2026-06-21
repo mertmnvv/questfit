@@ -3,7 +3,7 @@ import { db } from '../config/firebase';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
-const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY;
 
 /**
  * Yemek sorgusu yapar. Önce Firestore (kendi veritabanımız) kontrol edilir.
@@ -71,7 +71,8 @@ Format şu şekilde bir DİZİ olmalı:
     if (data.error) throw new Error(data.error.message);
 
     const textResponse = data.choices[0].message.content;
-    const cleanJsonString = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    const jsonMatch = textResponse.match(/\[[\s\S]*\]/);
+    const cleanJsonString = jsonMatch ? jsonMatch[0] : textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
     
     // AI'dan artık bir DİZİ (Array) bekliyoruz
     let parsedArray = [];
@@ -121,7 +122,17 @@ Format şu şekilde bir DİZİ olmalı:
 
   } catch (error) {
     console.error('Besin Arama/Cache Hatası:', error);
-    return [];
+    // Mock fallback on error to prevent crashes
+    return [{
+      id: `mock_${Date.now()}`,
+      name: language === 'en' ? 'Mock Data (AI Error)' : 'Örnek Veri (Yapay Zeka Hatası)',
+      type: language === 'en' ? 'System Fallback' : 'Sistem Yedeği',
+      description: language === 'en' ? '1 Unit: 100 kcal | P: 10g' : '1 Birim: 100 kcal | P: 10g',
+      baseAmount: 1,
+      pieceWeight: 0,
+      portionWeight: 100,
+      macros: { calories: 100, protein: 10, carbs: 10, fat: 5 }
+    }];
   }
 };
 
@@ -174,50 +185,102 @@ export const searchFoodByBarcode = async (barcode) => {
  */
 export const analyzeFoodFromImage = async (base64Image, language = 'tr') => {
   try {
-    console.log('Resim Gemini AI Vision modeline gönderiliyor...');
+    console.log('Adım 1: Resim OpenRouter (Nvidia) Vision modeline gönderiliyor...');
     
-    if (!GEMINI_API_KEY) throw new Error('Gemini API anahtarı eksik.');
+    if (!OPENROUTER_API_KEY) throw new Error('OpenRouter API anahtarı eksik.');
+    if (!GROQ_API_KEY) throw new Error('Groq API anahtarı eksik.');
     
-    const prompt = `Sen uzman bir diyetisyensin. Gönderilen fotoğraftaki yemeği veya yiyecekleri analiz et. 
-Eğer bu bir tabak ise, tabağın içindeki tüm yiyecekleri tek bir öğün olarak topla.
-DİKKAT: Makro değerlerini (calories, protein, carbs, fat) tabaktaki tahmini porsiyon miktarına (örn: 1 tabak veya 1 porsiyon) göre hesapla.
-ÖNEMLİ: Yemek isimlerini (name) kesinlikle ve her zaman ${language === 'en' ? 'İngilizce (English)' : 'Türkçe'} dilinde döndür.
-SADECE GEÇERLİ BİR JSON DİZİSİ (ARRAY) DÖNDÜR! Markdown KULLANMA.
-Format şu olmalı:
-[
-  {"name": "${language === 'en' ? 'Food Name You See' : 'Gördüğün Yemeğin Adı'}", "calories": 450, "protein": 30, "carbs": 40, "fat": 15, "pieceWeight": 0, "portionWeight": 350}
-]`;
+    // Adım 1: Açık ve net bir şekilde sadece yemeğin İngilizce adını/tarifini istiyoruz.
+    const visionPrompt = `What food or drink is in this image? Describe the meal in English very briefly and concisely. Do not write JSON. Just write the name of the food or a short description of the plate.`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 saniye zaman aşımı
+
+    const visionResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://questfit.app',
+        'X-Title': 'QuestFit'
       },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType: 'image/jpeg', data: base64Image } }
-          ]
-        }],
-        generationConfig: {
-          responseMimeType: 'application/json'
-        }
+        model: 'nvidia/nemotron-nano-12b-v2-vl:free', // ZORUNLU: Ücretsiz Vision destekleyen tek model
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: visionPrompt },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
+            ]
+          }
+        ]
+      })
+    });
+    
+    clearTimeout(timeoutId);
+
+    const visionData = await visionResponse.json();
+    if (visionData.error) {
+      console.error('OpenRouter API Hatası:', visionData.error);
+      throw new Error(visionData.error.message || 'API Hatası');
+    }
+
+    if (!visionData.choices || !visionData.choices[0] || !visionData.choices[0].message || !visionData.choices[0].message.content) {
+      throw new Error('Görsel yapay zekası beklenen formatta yanıt vermedi.');
+    }
+
+    const foodDescriptionEn = visionData.choices[0].message.content.trim();
+    console.log('Adım 1 Tamamlandı. Bulunan Yemek (İngilizce):', foodDescriptionEn);
+
+    console.log('Adım 2: Yemek açıklaması Groq (Llama-3.3-70B) zekasına gönderiliyor...');
+    
+    // Adım 2: Groq (Llama 3.3 70B) ile açıklamayı makrolu JSON'a çeviriyoruz.
+    const groqPrompt = `Sen dünyanın en zeki ve uzman diyetisyenisin. Bir kullanıcı yemeğinin fotoğrafını çekti ve görsel yapay zeka bu yemeği şu şekilde tanımladı: "${foodDescriptionEn}".
+    
+Görevlerin:
+1. Bu yemeğin/yiyeceklerin ne olduğunu anla ve ismini ${language === 'en' ? 'İngilizce (English)' : 'Türkçe'} diline mükemmel bir şekilde çevir.
+2. Ortalama bir porsiyon için makro değerlerini (calories, protein, carbs, fat) tahmin et.
+3. SADECE GEÇERLİ BİR JSON DİZİSİ (ARRAY) DÖNDÜR! Markdown KULLANMA. Başka hiçbir açıklama metni yazma.
+
+Format şu olmalı:
+[
+  {"name": "${language === 'en' ? 'Grilled Salmon' : 'Izgara Somon'}", "calories": 450, "protein": 30, "carbs": 5, "fat": 15, "pieceWeight": 0, "portionWeight": 200}
+]`;
+
+    const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: groqPrompt }],
+        temperature: 0.1
       })
     });
 
-    const data = await response.json();
-    if (data.error) {
-      console.error('Gemini API Hatası:', data.error);
-      throw new Error(data.error.message);
+    const groqData = await groqResponse.json();
+    if (groqData.error) {
+      console.error('Groq API Hatası:', groqData.error);
+      throw new Error(groqData.error.message || 'Groq API Hatası');
     }
 
-    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts) {
-      throw new Error('Gemini API beklenen formatta yanıt vermedi.');
+    const textResponse = groqData.choices[0].message.content;
+    console.log('Groq Çıktısı:', textResponse);
+    
+    // Güvenli JSON ayıklama
+    const jsonMatch = textResponse.match(/\[[\s\S]*\]/);
+    let cleanJsonString = '';
+    
+    if (jsonMatch) {
+      cleanJsonString = jsonMatch[0];
+    } else {
+      // JSON formatı yoksa Llama metin dönmüş demektir
+      throw new Error("Diyetisyen yapay zeka yemek analizini çıkaramadı.");
     }
-
-    const textResponse = data.candidates[0].content.parts[0].text;
-    const cleanJsonString = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
     
     let parsedArray = [];
     try {
@@ -226,17 +289,11 @@ Format şu olmalı:
         parsedArray = [parsedArray];
       }
     } catch (e) {
-      console.error("Vision JSON Parse Hatası:", e, textResponse);
-      throw new Error("JSON Hatası: " + e.message);
+      console.error("Groq JSON Parse Hatası:", e, textResponse);
+      throw new Error("Yemek bulunamadı. Lütfen tekrar deneyin.");
     }
 
     const formattedItems = parsedArray.map((parsedItem, index) => ({
-      id: `vision_${Date.now()}_${index}`,
-      name: parsedItem.name || (language === 'en' ? 'Food Recognized from Image' : 'Görselden Tanınan Yemek'),
-      type: language === 'en' ? 'AI (Vision)' : 'Yapay Zeka (Görsel)',
-      description: language === 'en' 
-        ? `Plate Portion: ${parsedItem.calories} kcal | P: ${parsedItem.protein}g | C: ${parsedItem.carbs}g | F: ${parsedItem.fat}g`
-        : `Tabak Porsiyonu: ${parsedItem.calories} kcal | P: ${parsedItem.protein}g | K: ${parsedItem.carbs}g | Y: ${parsedItem.fat}g`,
       baseAmount: 1,
       pieceWeight: parsedItem.pieceWeight ? Number(parsedItem.pieceWeight) : 0,
       portionWeight: parsedItem.portionWeight ? Number(parsedItem.portionWeight) : 250,

@@ -24,6 +24,7 @@ export default function MainTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        animation: 'shift', // React Navigation v7 soft tab animation
         tabBarShowLabel: false, // Daha temiz bir görünüm için yazıları kaldırdık
         tabBarActiveTintColor: COLORS.background, // Seçili ikonu belirgin yap
         tabBarInactiveTintColor: COLORS.textMuted,

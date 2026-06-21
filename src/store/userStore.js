@@ -57,6 +57,7 @@ export const useUserStore = create(
       level: 1,
       xp: 0,
       streak: 0,
+      stepStreak: 0,
       weightHistory: [],
       workoutHistory: [],
       lastActiveDate: null, // Son giriş (streak) tarihi
@@ -65,6 +66,8 @@ export const useUserStore = create(
       appTheme: 'light', // 'light' | 'dark'
       appLanguage: null, // null = cihaz dili, 'en' | 'tr'
       tutorialSeen: false,
+      notificationsEnabled: true,
+      aiCustomPromptEnabled: false,
 
       // Aralıklı Oruç (Intermittent Fasting) State
       fastingState: {
@@ -97,6 +100,20 @@ export const useUserStore = create(
         }
       },
 
+      setNotificationsEnabled: (enabled) => {
+        set({ notificationsEnabled: enabled });
+        if (get().profile?.id) {
+          updateUserStats(get().profile.id, { notificationsEnabled: enabled }).catch(console.error);
+        }
+      },
+
+      setAiCustomPromptEnabled: (enabled) => {
+        set({ aiCustomPromptEnabled: enabled });
+        if (get().profile?.id) {
+          updateUserStats(get().profile.id, { aiCustomPromptEnabled: enabled }).catch(console.error);
+        }
+      },
+
       setTutorialSeen: (seen) => {
         set({ tutorialSeen: seen });
       },
@@ -106,7 +123,10 @@ export const useUserStore = create(
         const state = get();
         if (!state.profile) return;
 
-        const today = new Date().toISOString().split('T')[0];
+        // Local timezone date calculation
+        const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+        const localISOTime = new Date(Date.now() - tzOffset).toISOString().slice(0, -1);
+        const today = localISOTime.split('T')[0];
         const lastActive = state.lastActiveDate;
 
         if (lastActive === today) {
@@ -120,9 +140,9 @@ export const useUserStore = create(
         }
 
         if (!lastActive) {
-          set({ lastActiveDate: today, streak: 1, dailyQuests: getRandomQuests(4) });
+          set({ lastActiveDate: today, streak: 1, stepStreak: 0, dailyQuests: getRandomQuests(4) });
           if (state.profile.id) {
-            updateUserStats(state.profile.id, { lastActiveDate: today, streak: 1, dailyQuests: get().dailyQuests }).catch(console.log);
+            updateUserStats(state.profile.id, { lastActiveDate: today, streak: 1, stepStreak: 0, dailyQuests: get().dailyQuests }).catch(console.log);
           }
           return;
         }
@@ -143,6 +163,10 @@ export const useUserStore = create(
             newStreak = 1;
           }
         }
+        
+        // Pedometer streak logic will be handled by healthService to ensure accurate steps from OS.
+        let newStepStreak = state.stepStreak || 0;
+
 
         // Dünün değerlerini geçmişe kaydet
         let newCalorieHistory = [...(state.calorieHistory || [])];
@@ -161,6 +185,7 @@ export const useUserStore = create(
         set({
           lastActiveDate: today,
           streak: newStreak,
+          stepStreak: newStepStreak,
           calorieHistory: newCalorieHistory,
           consumedToday: { calories: 0, protein: 0, carbs: 0, fat: 0, water: 0, fiber: 0, burnedCalories: 0, aiWorkoutCompletedToday: false, boxesEarnedToday: 0 },
           dailyLog: { foods: [], workouts: [] },
@@ -172,6 +197,7 @@ export const useUserStore = create(
         if (state.profile.id) {
           updateUserStats(state.profile.id, { 
             streak: newStreak,
+            stepStreak: newStepStreak,
             calorieHistory: newCalorieHistory,
             claimedGoals: [],
             lastActiveDate: today,
@@ -212,6 +238,7 @@ export const useUserStore = create(
           level: profileData.level || 1,
           xp: profileData.exp || 0,
           streak: profileData.streak || 0,
+          stepStreak: profileData.stepStreak || 0,
           customRoutines: profileData.customRoutines || [],
           weightHistory: profileData.weightHistory || [],
           calorieHistory: profileData.calorieHistory || [],
@@ -224,7 +251,12 @@ export const useUserStore = create(
           lastActiveDate: profileData.lastActiveDate || null,
           consumedToday: mergedConsumedToday,
           dailyLog: mergedDailyLog,
-          fastingState: profileData.fastingState || { isActive: false, startTime: null, durationHours: 16 }
+          fastingState: profileData.fastingState || { isActive: false, startTime: null, durationHours: 16 },
+          // Persistence fix: Hydrate settings from Firebase if available, otherwise keep local state
+          appTheme: profileData.appTheme || localState.appTheme || 'light',
+          appLanguage: profileData.appLanguage || localState.appLanguage,
+          notificationsEnabled: profileData.notificationsEnabled !== undefined ? profileData.notificationsEnabled : (localState.notificationsEnabled ?? true),
+          aiCustomPromptEnabled: profileData.aiCustomPromptEnabled !== undefined ? profileData.aiCustomPromptEnabled : (localState.aiCustomPromptEnabled ?? false),
         });
         
         // Profil yüklenince otomatik günlük reset kontrolü yap
@@ -292,6 +324,16 @@ export const useUserStore = create(
       // Adım Geçmişini Güncelleme
       updateStepHistory: (history) => {
         set({ stepHistory: history });
+        if (get().profile?.id) {
+          updateUserStats(get().profile.id, { stepHistory: history }).catch(console.error);
+        }
+      },
+      
+      setStepStreak: (streak) => {
+        set({ stepStreak: streak });
+        if (get().profile?.id) {
+          updateUserStats(get().profile.id, { stepStreak: streak }).catch(console.error);
+        }
       },
 
       // Kilo Güncelleme ve Geçmişe Ekleme
@@ -312,6 +354,13 @@ export const useUserStore = create(
           stats: calculatedStats,
           weightHistory: newHistory,
         });
+
+        if (profile.id) {
+          updateUserStats(profile.id, { 
+            weight: newWeight.toString(),
+            weightHistory: newHistory
+          }).catch(console.error);
+        }
 
         get().addXp(20);
       },
@@ -409,7 +458,7 @@ export const useUserStore = create(
       saveCustomRoutine: async (name, exercises) => {
         const { profile, customRoutines } = get();
         const newRoutine = {
-          id: Date.now().toString(),
+          id: Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9),
           name,
           exercises
         };
@@ -469,7 +518,7 @@ export const useUserStore = create(
           ...dailyLog,
           foods: [
             ...dailyLog.foods,
-            { id: Date.now().toString(), name, calories, protein, carbs, fat, mealType }
+            { id: Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9), name, calories, protein, carbs, fat, mealType }
           ]
         };
 

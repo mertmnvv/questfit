@@ -126,6 +126,7 @@ export default function DashboardScreen() {
     level,
     xp,
     streak,
+    stepStreak,
     addWater,
     updateWeight,
     weightHistory,
@@ -303,26 +304,41 @@ export default function DashboardScreen() {
       <StatusBar barStyle={COLORS.background === '#0D1117' ? 'light-content' : 'dark-content'} backgroundColor={COLORS.background} />
       <LinearGradient colors={[COLORS.background, COLORS.card, COLORS.background]} style={styles.gradient}>
         
-        {/* Header */}
+        {/* Symmetrical Minimalist Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>
-              {t('common.back') === 'Geri' ? 'Merhaba,' : 'Hello,'} {profile?.nickname || 'User'}
-            </Text>
-            <Text style={styles.email}>{user?.email}</Text>
-          </View>
+          <Text style={styles.greetingTitle} numberOfLines={1} adjustsFontSizeToFit>
+            {t('common.back') === 'Geri' ? 'Merhaba,' : 'Hello,'} <Text style={{ color: COLORS.text }}>{profile?.nickname || 'User'}</Text>
+          </Text>
           
           <View style={styles.headerBadges}>
+            {/* Step Streak Indicator */}
+            <TouchableOpacity 
+              style={[styles.streakBadge, { backgroundColor: '#40C057', marginRight: 8 }]}
+              onPress={() => navigation.navigate('Stats')}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="shoe-print" size={16} color="#FFFFFF" style={{ marginRight: 2 }} />
+              <Text style={[styles.streakText, { color: '#FFFFFF' }]}>{stepStreak || 0}</Text>
+            </TouchableOpacity>
+
             {/* Streak Indicator */}
-            <View style={styles.streakBadge}>
+            <TouchableOpacity 
+              style={[styles.streakBadge, { marginRight: 8 }]}
+              onPress={() => navigation.navigate('Stats')}
+              activeOpacity={0.8}
+            >
               <MaterialCommunityIcons name="fire" size={16} color="#0D1117" style={{ marginRight: 2 }} />
               <Text style={styles.streakText}>{streak || 0}</Text>
-            </View>
+            </TouchableOpacity>
             
             {/* Level Badge */}
-            <View style={styles.levelBadge}>
+            <TouchableOpacity 
+              style={styles.levelBadge}
+              onPress={() => navigation.navigate('QuestsTab')}
+              activeOpacity={0.8}
+            >
               <Text style={styles.levelText}>LVL {level || 1}</Text>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -645,19 +661,14 @@ const getStyles = (COLORS, isDark) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomWidth: 0,
   },
-  greeting: {
-    fontFamily: TYPOGRAPHY.fontFamily.bold,
+  greetingTitle: {
+    fontFamily: TYPOGRAPHY.fontFamily.medium,
     fontSize: FONT_SIZE.lg,
-    color: COLORS.text,
-  },
-  email: {
-    fontFamily: TYPOGRAPHY.fontFamily.regular,
-    fontSize: FONT_SIZE.xs,
     color: COLORS.textSecondary,
-    marginTop: 2,
+    flex: 1, // Uzun isimlerde sağa taşmaması için
+    marginRight: SPACING.sm,
   },
   headerBadges: {
     flexDirection: 'row',
