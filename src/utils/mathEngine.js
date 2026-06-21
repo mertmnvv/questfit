@@ -35,16 +35,28 @@ export const calculateTDEE = (bmr, activityMultiplier = 1.375) => {
  * Hedefe göre günlük alınması gereken kaloriyi hesaplar
  * @param {number} tdee
  * @param {string} goal - 'lose' | 'maintain' | 'gain'
+ * @param {string} gender - 'male' | 'female'
  * @returns {number} Hedef Kalori (kcal)
  */
-export const calculateTargetCalories = (tdee, goal) => {
+export const calculateTargetCalories = (tdee, goal, gender = 'male') => {
+  let target = tdee;
+  
   if (goal === 'lose' || goal === 'Lose Weight') {
-    return tdee - 500;
+    // Çok hızlı kilo vermek yerine daha güvenli bir açık: %20 veya 500 kcal
+    const deficit = Math.min(500, tdee * 0.20); 
+    target = Math.round(tdee - deficit);
   } else if (goal === 'gain' || goal === 'Build Muscle') {
-    return tdee + 500;
-  } else {
-    return tdee;
+    // Kas yapmak için yavaş ve temiz büyüme (clean bulk): +300 veya 500
+    target = Math.round(tdee + 400); 
   }
+
+  // Medikal Güvenlik Kilidi: Kadınlar 1200, Erkekler 1500 kalorinin altına inmemelidir.
+  const minCals = gender === 'female' ? 1200 : 1500;
+  if (target < minCals) {
+    target = minCals;
+  }
+
+  return target;
 };
 
 /**
@@ -57,43 +69,63 @@ export const calculateTargetCalories = (tdee, goal) => {
  * @returns {object} { protein, fat, carbs } (gram)
  */
 export const calculateMacros = (weight, targetCalories, goal, macroSplit = 'balanced', bodyType = 'mesomorph') => {
-  let proteinGrams, fatGrams, carbsGrams;
+  let proteinRatio, fatRatio, carbsRatio;
 
   if (macroSplit === 'keto') {
-    // Keto: %25 Protein, %70 Yağ, %5 Karb
-    proteinGrams = Math.round((targetCalories * 0.25) / 4);
-    fatGrams = Math.round((targetCalories * 0.70) / 9);
-    carbsGrams = Math.round((targetCalories * 0.05) / 4);
+    // Keto: %20 Protein, %75 Yağ, %5 Karb
+    proteinRatio = 0.20;
+    fatRatio = 0.75;
+    carbsRatio = 0.05;
   } else if (macroSplit === 'high_protein') {
-    // Yüksek Protein: %40 Protein, %30 Yağ, %30 Karb
-    proteinGrams = Math.round((targetCalories * 0.40) / 4);
-    fatGrams = Math.round((targetCalories * 0.30) / 9);
-    carbsGrams = Math.round((targetCalories * 0.30) / 4);
+    // Yüksek Protein: %30 Protein, %30 Yağ, %40 Karb
+    proteinRatio = 0.30;
+    fatRatio = 0.30;
+    carbsRatio = 0.40;
   } else {
-    // Balanced: Vücut tipine özel makro dağılımı
-    let proteinRatio = 0.30;
-    let fatRatio = 0.30;
-    let carbsRatio = 0.40; // Default Mesomorph
-
+    // Balanced (Dengeli): Vücut tipine göre dinamik sağlıklı oranlar
     if (bodyType === 'ectomorph') {
-      proteinRatio = 0.25;
+      // Ektomorf (Hızlı metabolizma, karbonhidratı iyi tolere eder)
+      proteinRatio = 0.20;
       fatRatio = 0.25;
-      carbsRatio = 0.50; // Yüksek Karb (Ektomorf)
+      carbsRatio = 0.55; 
     } else if (bodyType === 'endomorph') {
-      proteinRatio = 0.35;
-      fatRatio = 0.40;
-      carbsRatio = 0.25; // Düşük Karb (Endomorf)
+      // Endomorf (Yavaş metabolizma, yağı karbonhidrattan daha iyi tolere eder)
+      proteinRatio = 0.25;
+      fatRatio = 0.45;
+      carbsRatio = 0.30; 
+    } else {
+      // Mesomorf (Standart atletik yapı)
+      proteinRatio = 0.25;
+      fatRatio = 0.30;
+      carbsRatio = 0.45;
     }
+  }
 
-    proteinGrams = Math.round((targetCalories * proteinRatio) / 4);
-    fatGrams = Math.round((targetCalories * fatRatio) / 9);
-    carbsGrams = Math.round((targetCalories * carbsRatio) / 4);
+  // Güvenlik: Düşük kalorili diyetlerde (Zayıflama vb.) protein kas kaybını önlemek için 
+  // gramaj olarak kilonun 1.2 katının altına inmesin (eğer yüzde hesaplaması yetersiz kalırsa).
+  let proteinGrams = Math.round((targetCalories * proteinRatio) / 4);
+  const minProteinGrams = Math.round(weight * 1.2);
+  
+  if (proteinGrams < minProteinGrams) {
+    proteinGrams = minProteinGrams;
+    const proteinCals = proteinGrams * 4;
+    const remainingCals = targetCalories - proteinCals;
+    
+    // Karbonhidrat ve Yağı kalan kaloriye göre yeniden dağıt
+    const dynamicCarbRatio = carbsRatio / (carbsRatio + fatRatio);
+    const dynamicFatRatio = fatRatio / (carbsRatio + fatRatio);
+    
+    return {
+      protein: proteinGrams,
+      fat: Math.round((remainingCals * dynamicFatRatio) / 9),
+      carbs: Math.round((remainingCals * dynamicCarbRatio) / 4),
+    };
   }
 
   return {
     protein: proteinGrams,
-    fat: fatGrams,
-    carbs: carbsGrams,
+    fat: Math.round((targetCalories * fatRatio) / 9),
+    carbs: Math.round((targetCalories * carbsRatio) / 4),
   };
 };
 
@@ -107,7 +139,7 @@ export const calculateAllStats = (profileData) => {
 
   const bmr = calculateBMR(profileData.gender, profileData.weight, profileData.height, profileData.age);
   const tdee = calculateTDEE(bmr);
-  const targetCalories = calculateTargetCalories(tdee, profileData.goal);
+  const targetCalories = calculateTargetCalories(tdee, profileData.goal, profileData.gender);
   
   // Diyet planı varsa macroSplit bilgisini al, yoksa balanced kullan
   let macroSplit = profileData.macroSplit || 'balanced';
@@ -118,10 +150,15 @@ export const calculateAllStats = (profileData) => {
   const macros = calculateMacros(profileData.weight, targetCalories, profileData.goal, macroSplit, bodyType);
 
   // Default mikrolar (kullanıcı daha sonra ayarlardan ezebilir)
-  // Su: Kilo başına 35ml ortalama
-  const waterLiters = parseFloat(((profileData.weight * 35) / 1000).toFixed(1));
-  // Lif: Ortalama 30g sabit veya kaloriye göre hesaplanabilir (her 1000 kalori için 14g)
-  const fiberGrams = Math.round((targetCalories / 1000) * 14);
+  // Su: Kilo başına 35ml ortalama, minimum 2.0L, maksimum 4.5L (Su zehirlenmesini önlemek için)
+  let waterLiters = parseFloat(((profileData.weight * 35) / 1000).toFixed(1));
+  if (waterLiters < 2.0) waterLiters = 2.0;
+  if (waterLiters > 4.5) waterLiters = 4.5;
+
+  // Lif: Ortalama her 1000 kalori için 14g, minimum 25g, maksimum 50g (Sindirim sorunlarını önlemek için)
+  let fiberGrams = Math.round((targetCalories / 1000) * 14);
+  if (fiberGrams < 25) fiberGrams = 25;
+  if (fiberGrams > 50) fiberGrams = 50;
 
   // Eğer kullanıcının özel mikro ayarları (customMicros) varsa onları kullan, yoksa defaultları ver
   const micros = {

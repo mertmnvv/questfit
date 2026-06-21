@@ -89,7 +89,8 @@
     "mesomorph": "Mezomorf",
     "mesoDesc": "Atletik yapı, dengeli. Kolayca kas kazanır.",
     "endomorph": "Endomorf",
-    "endoDesc": "İri yapı, yavaş metabolizma. Yüksek fiziksel güç."
+    "endoDesc": "İri yapı, yavaş metabolizma. Yüksek fiziksel güç.",
+    "medicalWarning": "⚠️ Lütfen bu diyetleri ve hedefleri uygulamadan önce mutlaka doktorunuza danışınız."
   },
   "dashboard": {
     "water": "Su",
@@ -221,6 +222,7 @@
       "noExercisesYet": "Henüz hareket eklemedin.",
       "newRoutineTitle": "Yeni Program",
       "addCustomLabel": "Özel Hareket Ekle",
+      "addExerciseModalTitle": "Hareket Seç",
       "addBtn": "Ekle"
     }
   },
@@ -349,16 +351,17 @@
     "balancedWarning": "",
     "balancedArticle": "https://www.eatright.org/health/wellness/your-overall-health/what-is-a-healthy-diet",
     "keto": "Ketojenik",
-    "ketoDesc": "Çok düşük Karbonhidrat (%5), Yüksek Yağ (%70). Enerjiyi yağdan almayı sağlar.",
+    "ketoDesc": "Çok düşük Karb (%5), Yüksek Yağ (%75), Orta Protein (%20). Enerjiyi yağdan alır.",
     "ketoWarning": "İlk haftalarda halsizlik ve 'Keto Gribi' yaşanabilir. Elektrolit alımına çok dikkat edilmelidir.",
     "ketoArticle": "https://www.health.harvard.edu/blog/ketogenic-diet-is-the-ultimate-low-carb-diet-good-for-you-2017072712089",
     "highProtein": "Yüksek Protein",
-    "highProteinDesc": "Kas kazanımı ve korunması için arttırılmış protein oranı (%40).",
+    "highProteinDesc": "Kas kazanımı ve korunması için arttırılmış protein oranı (%30).",
     "highProteinWarning": "Yetersiz su tüketimi böbrekleri yorabilir. Bol su içmeye ve lif tüketmeye özen gösterin.",
     "highProteinArticle": "https://www.mayoclinic.org/healthy-lifestyle/nutrition-and-healthy-eating/expert-answers/high-protein-diets/faq-20058207",
     "infoTitle": "Diyet Bilgisi",
     "readArticle": "Bilimsel Makaleyi Oku",
-    "apply": "Plana Uygula"
+    "apply": "Planı Uygula",
+    "medicalWarning": "⚠️ Bu beslenme programlarını uygulamadan önce mutlaka doktorunuza veya diyetisyeninize danışınız."
   },
   "tutorial": {
     "step1Title": "Kalori Takibi",

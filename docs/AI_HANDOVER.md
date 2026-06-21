@@ -1,7 +1,7 @@
 # QuestFit - AI Handover Document
 
 ## Project Context
-QuestFit is a modern Health, Diet, and Fitness application that combines traditional calorie tracking and workout generation with RPG (Role Playing Game) gamification elements. The app is built using React Native (Expo) and uses Firebase for authentication and database caching. Zustand is used for global state management. It also utilizes Groq API (Llama models) for AI-powered feature generation.
+QuestFit is a modern Health, Diet, and Fitness application that combines traditional calorie tracking and workout generation with RPG (Role Playing Game) gamification elements. The app is built using React Native (Expo) and uses Firebase for authentication and database caching. Zustand is used for global state management with offline persistence (`AsyncStorage`). It also utilizes Groq API (Llama models) for AI-powered feature generation.
 
 ## Current State & Completed Features
 We have successfully built and integrated the core loops of the application. The project is almost ready for production.
@@ -29,15 +29,17 @@ We have successfully built and integrated the core loops of the application. The
 - AI Workout Generator: Generates equipment-aware and environment-aware workouts using Groq API.
 - Fatigue/Recovery System: Tracks muscle fatigue to suggest lighter workouts on rest days.
 
-### 5. Stability Fixes
+### 5. Persistence, UI & Stability Fixes
 - Android Crash Fix: Handled the `ReactActivityDelegate.onUserLeaveHint` NullPointerException bug by wrapping `super.onUserLeaveHint()` in a try/catch block inside `MainActivity.kt`.
+- **00:00 Daily Reset & Background Fix**: Implemented an `AppState` listener in `AppNavigator.js` that ensures midnight rollovers and data resets execute correctly when the app is resumed from the background.
+- **Firebase Sync**: `weightHistory` and `stepHistory` now persist directly to Firebase inside `userStore.js`.
+- **UI Overhaul**: The application UI was recently modernized to a more "flat" and minimalist premium design. Heavy shadows, unnecessary borders, and excessive glassmorphism gradients were removed (especially in the Tutorial Modal and Quest Levels) to establish a cleaner aesthetic.
 
 ## Next Steps for the Incoming AI
-The user requested "simple but innovative ideas" in the previous session. The following ideas were proposed but have NOT been implemented yet:
-1. Voice-logged meals (Voice to Text -> AI macro extraction).
-2. Stamina/Health Bar tied to the fatigue and sleep score.
-3. Unlockable UI Themes based on RPG levels.
-4. Tamagotchi style pet (e.g. dragon egg that hatches and grows as the user drinks water).
+The user has decided to implement two main features for the empty **Community Screen**:
+1. **Achievement Broadcasts:** Shareable rich cards when a user levels up or hits a streak.
+2. **Shareable Workouts:** The ability to share an AI-generated or custom routine to the feed, allowing other users to click "Save Routine" and add it to their profile.
+> **Note:** A detailed plan for these two features exists in `docs/ROADMAP.md`. Read it before starting.
 
 ### Known Technical Debt / Warnings
 - **BROKEN FEATURES:** The **Barcode Scanner** and **Image-to-Calories (Vision AI)** features are currently NOT working. They have been implemented in `MealsScreen.js` and `foodService.js`, but they require debugging in the next session to identify why they fail to scan or return results.

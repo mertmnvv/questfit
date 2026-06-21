@@ -216,6 +216,9 @@ export default function OnboardingScreen({ navigation }) {
           </TouchableOpacity>
         );
       })}
+      <Text style={[styles.glassListDesc, { color: '#FFA8A8', marginTop: 10, textAlign: 'center', fontStyle: 'italic', fontSize: 11 }]}>
+        {t('onboarding.medicalWarning')}
+      </Text>
     </View>
   );
 

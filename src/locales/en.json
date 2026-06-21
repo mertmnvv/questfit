@@ -89,7 +89,8 @@
     "mesomorph": "Mesomorph",
     "mesoDesc": "Athletic frame, balanced. Gains muscle easily.",
     "endomorph": "Endomorph",
-    "endoDesc": "Solid frame, slower metabolism. High strength."
+    "endoDesc": "Solid frame, slower metabolism. High strength.",
+    "medicalWarning": "⚠️ Always consult your doctor or physician before starting any diet or fitness program."
   },
   "dashboard": {
     "water": "Water",
@@ -235,6 +236,7 @@
       "noExercisesYet": "No exercises added yet.",
       "newRoutineTitle": "New Routine",
       "addCustomLabel": "Add Custom Exercise",
+      "addExerciseModalTitle": "Select Exercise",
       "addBtn": "Add"
     }
   },
@@ -363,16 +365,17 @@
     "balancedWarning": "",
     "balancedArticle": "https://www.eatright.org/health/wellness/your-overall-health/what-is-a-healthy-diet",
     "keto": "Ketogenic",
-    "ketoDesc": "Very low Carbs (5%), High Fat (70%). Energy from fat.",
+    "ketoDesc": "Very low Carbs (5%), High Fat (75%), Moderate Protein (20%). Energy from fat.",
     "ketoWarning": "You might experience 'Keto Flu' in the first weeks. Pay attention to electrolyte intake.",
     "ketoArticle": "https://www.health.harvard.edu/blog/ketogenic-diet-is-the-ultimate-low-carb-diet-good-for-you-2017072712089",
     "highProtein": "High Protein",
-    "highProteinDesc": "Increased protein ratio (40%) for muscle gain and preservation.",
+    "highProteinDesc": "Increased protein ratio (30%) for muscle gain and preservation.",
     "highProteinWarning": "Inadequate water intake can strain kidneys. Ensure high water and fiber consumption.",
     "highProteinArticle": "https://www.mayoclinic.org/healthy-lifestyle/nutrition-and-healthy-eating/expert-answers/high-protein-diets/faq-20058207",
     "infoTitle": "Diet Information",
     "readArticle": "Read Scientific Article",
-    "apply": "Apply Plan"
+    "apply": "Apply Plan",
+    "medicalWarning": "⚠️ Always consult your doctor or dietitian before applying these nutrition programs."
   },
   "tutorial": {
     "step1Title": "Calorie Tracker",

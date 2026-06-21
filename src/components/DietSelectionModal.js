@@ -89,6 +89,9 @@ export default function DietSelectionModal({ visible, onClose, currentPlan, onSa
 
               <Text style={styles.sectionTitle}>{t('diet.macroGoal')}</Text>
               {MACRO_OPTIONS.map(item => renderOption(item, macroSplit, setMacroSplit))}
+              <Text style={[styles.cardDesc, { color: '#FFA8A8', textAlign: 'center', marginTop: SPACING.xl, fontStyle: 'italic', fontSize: 11 }]}>
+                {t('diet.medicalWarning')}
+              </Text>
             </ScrollView>
 
             <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
