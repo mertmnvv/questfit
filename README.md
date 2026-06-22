@@ -37,4 +37,4 @@ QuestFit is an innovative health and fitness application that combines classic c
 1. Clone the repository to your local machine.
 2. Run `npm install` in your terminal to install dependencies.
 3. Start the application by running `npx expo start`.
-....
+   
