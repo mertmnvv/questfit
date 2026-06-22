@@ -1,0 +1,30 @@
+name: QuestFit - Telegram CI/CD Bildirimi
+
+on:
+  push:
+    branches:
+      - main     # Ana dal
+      - develop  # İleride bir test/geliştirme dalı açarsan buraya eklersin
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    name: Telegram Bildirim Gönderimi
+    steps:
+      - name: Send Notification
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          format: html # Mesajı HTML olarak formatlıyoruz
+          message: |
+            <b>🚀 QuestFit - Kod Güncellemesi</b>
+
+            <b>Geliştirici:</b> <code>${{ github.actor }}</code>
+            <b>Dal (Branch):</b> <code>${{ github.ref_name }}</code>
+            
+            <b>Commit Mesajı:</b>
+            <i>${{ github.event.head_commit.message }}</i>
+            
+            <a href="${{ github.event.head_commit.url }}">Değişiklikleri Gör</a>
+            
