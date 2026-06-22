@@ -36,7 +36,6 @@ export default function QuestScreen() {
     dailyLog,
     claimedGoals,
     claimGoal,
-    equippedItems,
     dailyQuests,
     fastingState,
     streak,
@@ -171,7 +170,7 @@ export default function QuestScreen() {
     
     Toast.show({
       type: 'success',
-      text1: `+${xpReward} XP! 🎯`,
+      text1: `+${xpReward} XP`,
       text2: t('quests.goalCompleted', { title }),
       position: 'top',
       topOffset: 60,

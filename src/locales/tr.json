@@ -3,7 +3,7 @@
     "save": "Kaydet",
     "cancel": "İptal",
     "back": "Geri",
-    "next": "İleri →",
+    "next": "İleri",
     "close": "Kapat",
     "add": "+ Ekle",
     "edit": "Düzenle",
@@ -90,7 +90,7 @@
     "mesoDesc": "Atletik yapı, dengeli. Kolayca kas kazanır.",
     "endomorph": "Endomorf",
     "endoDesc": "İri yapı, yavaş metabolizma. Yüksek fiziksel güç.",
-    "medicalWarning": "⚠️ Lütfen bu diyetleri ve hedefleri uygulamadan önce mutlaka doktorunuza danışınız."
+    "medicalWarning": "Lütfen bu diyetleri ve hedefleri uygulamadan önce mutlaka doktorunuza danışınız."
   },
   "dashboard": {
     "water": "Su",
@@ -129,21 +129,21 @@
     "liquidSnack": "Sıvı / Atıştırmalık"
   },
   "notifications": {
-    "waterTitle": "Su İçme Vakti! 💧",
+    "waterTitle": "Su İçme Vakti!",
     "waterBody": "Günlük su hedefine ulaşmak için bir bardak su içmeyi unutma.",
-    "workoutTitle": "Antrenman Serin Bekliyor! 🔥",
+    "workoutTitle": "Antrenman Serin Bekliyor!",
     "workoutBody": "Bugün henüz antrenman yapmadın. Serini bozmamak için hemen başla!",
-    "ifStartTitle": "Oruç Bitti, Afiyet Olsun! 🍽️",
+    "ifStartTitle": "Oruç Bitti, Afiyet Olsun!",
     "ifStartBody": "Yeme penceren açıldı. İlk öğününü yiyebilirsin.",
-    "ifEndTitle": "Oruç Başlıyor! ⏳",
+    "ifEndTitle": "Oruç Başlıyor!",
     "ifEndBody": "Yeme penceren kapanıyor. Suyunu iç ve oruca hazırlan.",
-    "omadTitle": "Büyük Ziyafet Vakti! 🥩",
+    "omadTitle": "Büyük Ziyafet Vakti!",
     "omadBody": "Günün tek ve devasa öğününü yeme zamanı geldi.",
-    "classicBreakfastTitle": "Kahvaltı Zamanı! 🍳",
+    "classicBreakfastTitle": "Kahvaltı Zamanı!",
     "classicBreakfastBody": "Güne enerjik başlamak için kahvaltını yapmayı unutma.",
-    "classicLunchTitle": "Öğle Yemeği Vakti! 🥗",
+    "classicLunchTitle": "Öğle Yemeği Vakti!",
     "classicLunchBody": "Öğle yemeği ile enerjini tazele.",
-    "classicDinnerTitle": "Akşam Yemeği! 🍲",
+    "classicDinnerTitle": "Akşam Yemeği!",
     "classicDinnerBody": "Günün son ana öğünü için masaya oturma vakti."
   },
   "meals": {
@@ -227,8 +227,8 @@
     }
   },
   "quests": {
-    "title": "Günlük Hedefler",
-    "subtitle": "İstikrar sağlamak ve XP ödülleri toplamak için günlük hedefleri tamamlayın!",
+    "title": "Görevler",
+    "subtitle": "İstikrar sağlamak ve gelişim puanları toplamak için günlük görevleri tamamlayın!",
     "nutritionTab": "Beslenme",
     "workoutTab": "Antrenman",
     "completed": "Tamamlandı!",
@@ -361,7 +361,7 @@
     "infoTitle": "Diyet Bilgisi",
     "readArticle": "Bilimsel Makaleyi Oku",
     "apply": "Planı Uygula",
-    "medicalWarning": "⚠️ Bu beslenme programlarını uygulamadan önce mutlaka doktorunuza veya diyetisyeninize danışınız."
+    "medicalWarning": "Bu beslenme programlarını uygulamadan önce mutlaka doktorunuza veya diyetisyeninize danışınız."
   },
   "tutorial": {
     "step1Title": "Kalori Takibi",
@@ -386,7 +386,7 @@
     "permissionError": "Yetki Hatası",
     "firebaseRulesError": "Gönderiler yüklenemedi. Veritabanı izinlerini kontrol edin.",
     "viewAllComments": "{{count}} yorumun tümünü gör",
-    "isFoodPost": "Bu bir yemektir 🍽️",
+    "isFoodPost": "Bu bir yemektir",
     "analyzingFood": "Yemek analiz ediliyor...",
     "comments": "Yorumlar",
     "noComments": "İlk yorumu siz yapın!",

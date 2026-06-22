@@ -187,7 +187,7 @@ export const useUserStore = create(
           streak: newStreak,
           stepStreak: newStepStreak,
           calorieHistory: newCalorieHistory,
-          consumedToday: { calories: 0, protein: 0, carbs: 0, fat: 0, water: 0, fiber: 0, burnedCalories: 0, aiWorkoutCompletedToday: false, boxesEarnedToday: 0 },
+          consumedToday: { calories: 0, protein: 0, carbs: 0, fat: 0, water: 0, fiber: 0, burnedCalories: 0, aiWorkoutCompletedToday: false },
           dailyLog: { foods: [], workouts: [] },
           claimedGoals: [],
           dailyQuests: getRandomQuests(4)
@@ -621,9 +621,6 @@ export const useUserStore = create(
           dailyLog: { foods: [], workouts: [] },
           claimedGoals: [],
           fastingState: { isActive: false, startTime: null, durationHours: 16 },
-          inventory: [],
-          equippedItems: { head: null, chest: null, weapon: null, pet: null },
-          boxes: { wood: 0, silver: 0, gold: 0 },
         });
       },
     }),

@@ -1,6 +1,5 @@
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY;
@@ -180,134 +179,8 @@ export const searchFoodByBarcode = async (barcode) => {
   }
 };
 
-/**
- * Gönderilen base64 resmi Groq Vision modeline iletip analiz eder.
- */
 export const analyzeFoodFromImage = async (base64Image, language = 'tr') => {
-  try {
-    console.log('Adım 1: Resim OpenRouter (Nvidia) Vision modeline gönderiliyor...');
-    
-    if (!OPENROUTER_API_KEY) throw new Error('OpenRouter API anahtarı eksik.');
-    if (!GROQ_API_KEY) throw new Error('Groq API anahtarı eksik.');
-    
-    // Adım 1: Açık ve net bir şekilde sadece yemeğin İngilizce adını/tarifini istiyoruz.
-    const visionPrompt = `What food or drink is in this image? Describe the meal in English very briefly and concisely. Do not write JSON. Just write the name of the food or a short description of the plate.`;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 saniye zaman aşımı
-
-    const visionResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://questfit.app',
-        'X-Title': 'QuestFit'
-      },
-      body: JSON.stringify({
-        model: 'nvidia/nemotron-nano-12b-v2-vl:free', // ZORUNLU: Ücretsiz Vision destekleyen tek model
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: visionPrompt },
-              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
-            ]
-          }
-        ]
-      })
-    });
-    
-    clearTimeout(timeoutId);
-
-    const visionData = await visionResponse.json();
-    if (visionData.error) {
-      console.error('OpenRouter API Hatası:', visionData.error);
-      throw new Error(visionData.error.message || 'API Hatası');
-    }
-
-    if (!visionData.choices || !visionData.choices[0] || !visionData.choices[0].message || !visionData.choices[0].message.content) {
-      throw new Error('Görsel yapay zekası beklenen formatta yanıt vermedi.');
-    }
-
-    const foodDescriptionEn = visionData.choices[0].message.content.trim();
-    console.log('Adım 1 Tamamlandı. Bulunan Yemek (İngilizce):', foodDescriptionEn);
-
-    console.log('Adım 2: Yemek açıklaması Groq (Llama-3.3-70B) zekasına gönderiliyor...');
-    
-    // Adım 2: Groq (Llama 3.3 70B) ile açıklamayı makrolu JSON'a çeviriyoruz.
-    const groqPrompt = `Sen dünyanın en zeki ve uzman diyetisyenisin. Bir kullanıcı yemeğinin fotoğrafını çekti ve görsel yapay zeka bu yemeği şu şekilde tanımladı: "${foodDescriptionEn}".
-    
-Görevlerin:
-1. Bu yemeğin/yiyeceklerin ne olduğunu anla ve ismini ${language === 'en' ? 'İngilizce (English)' : 'Türkçe'} diline mükemmel bir şekilde çevir.
-2. Ortalama bir porsiyon için makro değerlerini (calories, protein, carbs, fat) tahmin et.
-3. SADECE GEÇERLİ BİR JSON DİZİSİ (ARRAY) DÖNDÜR! Markdown KULLANMA. Başka hiçbir açıklama metni yazma.
-
-Format şu olmalı:
-[
-  {"name": "${language === 'en' ? 'Grilled Salmon' : 'Izgara Somon'}", "calories": 450, "protein": 30, "carbs": 5, "fat": 15, "pieceWeight": 0, "portionWeight": 200}
-]`;
-
-    const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: groqPrompt }],
-        temperature: 0.1
-      })
-    });
-
-    const groqData = await groqResponse.json();
-    if (groqData.error) {
-      console.error('Groq API Hatası:', groqData.error);
-      throw new Error(groqData.error.message || 'Groq API Hatası');
-    }
-
-    const textResponse = groqData.choices[0].message.content;
-    console.log('Groq Çıktısı:', textResponse);
-    
-    // Güvenli JSON ayıklama
-    const jsonMatch = textResponse.match(/\[[\s\S]*\]/);
-    let cleanJsonString = '';
-    
-    if (jsonMatch) {
-      cleanJsonString = jsonMatch[0];
-    } else {
-      // JSON formatı yoksa Llama metin dönmüş demektir
-      throw new Error("Diyetisyen yapay zeka yemek analizini çıkaramadı.");
-    }
-    
-    let parsedArray = [];
-    try {
-      parsedArray = JSON.parse(cleanJsonString);
-      if (!Array.isArray(parsedArray)) {
-        parsedArray = [parsedArray];
-      }
-    } catch (e) {
-      console.error("Groq JSON Parse Hatası:", e, textResponse);
-      throw new Error("Yemek bulunamadı. Lütfen tekrar deneyin.");
-    }
-
-    const formattedItems = parsedArray.map((parsedItem, index) => ({
-      baseAmount: 1,
-      pieceWeight: parsedItem.pieceWeight ? Number(parsedItem.pieceWeight) : 0,
-      portionWeight: parsedItem.portionWeight ? Number(parsedItem.portionWeight) : 250,
-      macros: {
-        calories: parseFloat(parsedItem.calories) || 0,
-        protein: parseFloat(parsedItem.protein) || 0,
-        carbs: parseFloat(parsedItem.carbs) || 0,
-        fat: parseFloat(parsedItem.fat) || 0,
-      }
-    }));
-
-    return formattedItems;
-  } catch (error) {
-    console.error('Resim Analiz Hatası:', error.message || error);
-    throw new Error('API Hatası: ' + (error.message || 'Bilinmeyen Hata'));
-  }
+  console.log('[FoodService] Image analysis is disabled.');
+  throw new Error('Image analysis features are currently unavailable.');
 };
+

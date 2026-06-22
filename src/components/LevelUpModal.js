@@ -53,14 +53,14 @@ export default function LevelUpModal({ visible, newLevel, onClose }) {
       />
       
       <Animated.View style={[styles.modalBox, { transform: [{ scale: scaleAnim }] }]}>
-        <Text style={styles.title}>LEVEL UP! 🎉</Text>
-        <Text style={styles.subtitle}>Tebrikler Maceracı!</Text>
+        <Text style={styles.title}>YENİ SEVİYE!</Text>
+        <Text style={styles.subtitle}>Gelişiminiz Devam Ediyor!</Text>
         
         <View style={styles.levelCircle}>
           <Text style={styles.levelNumber}>{newLevel}</Text>
         </View>
         
-        <Text style={styles.desc}>Daha da güçlendin ve yeni zorluklara hazırsın.</Text>
+        <Text style={styles.desc}>Sağlıklı yaşam yolculuğunuzda yeni bir aşamaya ulaştınız.</Text>
 
         <TouchableOpacity style={styles.button} onPress={onClose} activeOpacity={0.8}>
           <Text style={styles.buttonText}>Devam Et</Text>
